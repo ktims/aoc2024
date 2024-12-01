@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Lines};
 use std::iter::zip;
@@ -41,22 +42,43 @@ fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
         }
         let line = line.unwrap();
         let parts: Vec<&str> = line.split_ascii_whitespace().collect();
-        left.push(Entry{pos, val: parts[0].parse::<u32>().unwrap()});
-        right.push(Entry{pos, val: parts[1].parse::<u32>().unwrap()});
+        left.push(Entry {
+            pos,
+            val: parts[0].parse::<u32>().unwrap(),
+        });
+        right.push(Entry {
+            pos,
+            val: parts[1].parse::<u32>().unwrap(),
+        });
     }
     left.sort_by_key(|entry| entry.val);
     right.sort_by_key(|entry| entry.val);
 
     println!("{:?}", right);
-    
-    zip(left, right).map(|(left, right)| { 
-        println!("{:?} {:?}", left, right);
-        u64::abs_diff(left.val as u64, right.val as u64)}).sum()
+
+    zip(left, right)
+        .map(|(left, right)| {
+            println!("{:?} {:?}", left, right);
+            u64::abs_diff(left.val as u64, right.val as u64)
+        })
+        .sum()
 }
 
 // PROBLEM 2 solution
 fn problem2<T: BufRead>(input: Lines<T>) -> u64 {
-    0
+    let mut left = Vec::new();
+    let mut right_count = HashMap::new();
+    for (pos, line) in input.enumerate() {
+        if line.is_err() {
+            panic!("can't read line");
+        }
+        let line = line.unwrap();
+        let parts: Vec<&str> = line.split_ascii_whitespace().collect();
+        left.push(parts[0].parse::<u32>().unwrap());
+        let right = parts[1].parse::<u32>().unwrap();
+        right_count.insert(right, *right_count.get(&right).unwrap_or(&0) + 1);
+    }
+    left.iter().map(|l| l * right_count.get(l).unwrap_or(&0)).sum::<u32>() as u64
 }
 
 #[cfg(test)]
@@ -80,6 +102,6 @@ mod tests {
     #[test]
     fn problem2_example() {
         let c = Cursor::new(EXAMPLE);
-        assert_eq!(problem2(c.lines()), 0);
+        assert_eq!(problem2(c.lines()), 31);
     }
 }
