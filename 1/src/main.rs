@@ -25,60 +25,58 @@ fn main() {
     println!("Problem 2 solution: {} [{}s]", ans2, duration.as_secs_f64());
 }
 
-// PROBLEM 1 solution
-
-#[derive(Debug)]
-struct Entry {
-    pos: usize,
-    val: u32,
+struct Locations {
+    left: Vec<u64>,
+    right: Vec<u64>,
 }
 
-fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
-    let mut left = Vec::new();
-    let mut right = Vec::new();
-    for (pos, line) in input.enumerate() {
-        if line.is_err() {
-            panic!("can't read line");
+impl<T: BufRead> From<Lines<T>> for Locations {
+    fn from(input: Lines<T>) -> Self {
+        let mut left = Vec::new();
+        let mut right = Vec::new();
+        for line in input.map(|i| i.unwrap()) {
+            let parts: Vec<&str> = line.split_ascii_whitespace().collect();
+            left.push(parts[0].parse::<u64>().unwrap());
+            right.push(parts[1].parse::<u64>().unwrap());
         }
-        let line = line.unwrap();
-        let parts: Vec<&str> = line.split_ascii_whitespace().collect();
-        left.push(Entry {
-            pos,
-            val: parts[0].parse::<u32>().unwrap(),
-        });
-        right.push(Entry {
-            pos,
-            val: parts[1].parse::<u32>().unwrap(),
-        });
+        Self { left, right }
     }
-    left.sort_by_key(|entry| entry.val);
-    right.sort_by_key(|entry| entry.val);
+}
 
-    println!("{:?}", right);
+impl Locations {
+    fn sort(&mut self) {
+        self.left.sort();
+        self.right.sort();
+    }
+    fn right_count(&self) -> HashMap<u64, u64> {
+        let mut right_count: HashMap<u64, u64> = HashMap::new();
+        for rval in &self.right {
+            right_count.insert(*rval, *right_count.get(rval).unwrap_or(&0) + 1);
+        }
+        right_count
+    }
+}
 
-    zip(left, right)
-        .map(|(left, right)| {
-            println!("{:?} {:?}", left, right);
-            u64::abs_diff(left.val as u64, right.val as u64)
-        })
+// PROBLEM 1 solution
+
+fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
+    let mut locations = Locations::from(input);
+    locations.sort();
+
+    zip(locations.left, locations.right)
+        .map(|(l, r)| u64::abs_diff(l, r))
         .sum()
 }
 
 // PROBLEM 2 solution
 fn problem2<T: BufRead>(input: Lines<T>) -> u64 {
-    let mut left = Vec::new();
-    let mut right_count = HashMap::new();
-    for (pos, line) in input.enumerate() {
-        if line.is_err() {
-            panic!("can't read line");
-        }
-        let line = line.unwrap();
-        let parts: Vec<&str> = line.split_ascii_whitespace().collect();
-        left.push(parts[0].parse::<u32>().unwrap());
-        let right = parts[1].parse::<u32>().unwrap();
-        right_count.insert(right, *right_count.get(&right).unwrap_or(&0) + 1);
-    }
-    left.iter().map(|l| l * right_count.get(l).unwrap_or(&0)).sum::<u32>() as u64
+    let locations = Locations::from(input);
+    let right_count = locations.right_count();
+    locations
+        .left
+        .iter()
+        .map(|l| l * right_count.get(l).unwrap_or(&0))
+        .sum::<u64>()
 }
 
 #[cfg(test)]
