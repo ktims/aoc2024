@@ -11,7 +11,7 @@ fn get_input() -> InputIter {
     br.lines()
 }
 
-fn duration_format(duration: &Duration) -> String {
+fn duration_format(duration: Duration) -> String {
     match duration.as_secs_f64() {
         x if x > 1.0 => format!("{:.3}s", x),
         x if x > 0.010 => format!("{:.3}ms", x * 1e3),
@@ -20,23 +20,18 @@ fn duration_format(duration: &Duration) -> String {
 }
 
 fn main() {
+    let input = get_input();
     let start = Instant::now();
-    let ans1 = problem1(get_input());
-    let duration = start.elapsed();
-    println!(
-        "Problem 1 solution: {} [{}]",
-        ans1,
-        duration_format(&duration)
-    );
+    let ans1 = problem1(input);
+    let duration1 = start.elapsed();
+    println!("Problem 1 solution: {} [{}]", ans1, duration_format(duration1));
 
+    let input = get_input();
     let start = Instant::now();
-    let ans2 = problem2(get_input());
-    let duration = start.elapsed();
-    println!(
-        "Problem 2 solution: {} [{}]",
-        ans2,
-        duration_format(&duration)
-    );
+    let ans2 = problem2(input);
+    let duration2 = start.elapsed();
+    println!("Problem 2 solution: {} [{}]", ans2, duration_format(duration2));
+    println!("Total duration: {}", duration_format(duration1 + duration2));
 }
 
 struct Reports {
@@ -59,12 +54,21 @@ impl<T: BufRead> From<Lines<T>> for Reports {
 
 impl Reports {
     fn is_safe(report: &Vec<u64>) -> bool {
-        (report.iter().zip(report.iter().skip(1)).all(|(a, b)| a > b)
-            || report.iter().zip(report.iter().skip(1)).all(|(a, b)| a < b))
-            && report
-                .iter()
-                .zip(report.iter().skip(1))
-                .all(|(a, b)| a.abs_diff(*b) >= 1 && a.abs_diff(*b) <= 3)
+        let mut ascending: bool = true;
+        let mut descending: bool = true;
+        for (a, b) in report.iter().zip(report.iter().skip(1)) {
+            if a > b {
+                ascending = false
+            }
+            if a < b {
+                descending = false;
+            }
+            let ad = a.abs_diff(*b);
+            if !(ad >= 1 && ad <= 3) || (!ascending && !descending) {
+                return false;
+            };
+        }
+        return true;
     }
     fn count_safe(&self) -> u64 {
         self.reports.iter().filter(|report| Self::is_safe(report)).count() as u64
