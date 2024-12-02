@@ -1,26 +1,28 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader, Lines};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 // BOILERPLATE
 type InputIter = Lines<BufReader<File>>;
 
-fn get_input() -> InputIter {
-    let f = File::open("input").unwrap();
-    let br = BufReader::new(f);
-    br.lines()
+fn duration_format(duration: &Duration) -> String {
+    match duration.as_secs_f64() {
+        x if x > 1.0 => format!("{:.3}s", x),
+        x if x > 0.010 => format!("{:.3}ms", x * 1e3),
+        x => format!("{:.3}us", x * 1e6),
+    }
 }
 
 fn main() {
     let start = Instant::now();
     let ans1 = problem1(get_input());
     let duration = start.elapsed();
-    println!("Problem 1 solution: {} [{}s]", ans1, duration.as_secs_f64());
+    println!("Problem 1 solution: {} [{}]", ans1, duration_format(&duration));
 
     let start = Instant::now();
     let ans2 = problem2(get_input());
     let duration = start.elapsed();
-    println!("Problem 2 solution: {} [{}s]", ans2, duration.as_secs_f64());
+    println!("Problem 2 solution: {} [{}]", ans2, duration_format(&duration));
 }
 
 // PROBLEM 1 solution
