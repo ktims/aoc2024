@@ -5,7 +5,13 @@ use std::time::{Duration, Instant};
 // BOILERPLATE
 type InputIter = Lines<BufReader<File>>;
 
-fn duration_format(duration: &Duration) -> String {
+pub fn get_input() -> InputIter {
+    let f = File::open("input").unwrap();
+    let br = BufReader::new(f);
+    br.lines()
+}
+
+fn duration_format(duration: Duration) -> String {
     match duration.as_secs_f64() {
         x if x > 1.0 => format!("{:.3}s", x),
         x if x > 0.010 => format!("{:.3}ms", x * 1e3),
@@ -14,15 +20,18 @@ fn duration_format(duration: &Duration) -> String {
 }
 
 fn main() {
+    let input = get_input();
     let start = Instant::now();
-    let ans1 = problem1(get_input());
-    let duration = start.elapsed();
-    println!("Problem 1 solution: {} [{}]", ans1, duration_format(&duration));
+    let ans1 = problem1(input);
+    let duration1 = start.elapsed();
+    println!("Problem 1 solution: {} [{}]", ans1, duration_format(duration1));
 
+    let input = get_input();
     let start = Instant::now();
-    let ans2 = problem2(get_input());
-    let duration = start.elapsed();
-    println!("Problem 2 solution: {} [{}]", ans2, duration_format(&duration));
+    let ans2 = problem2(input);
+    let duration2 = start.elapsed();
+    println!("Problem 2 solution: {} [{}]", ans2, duration_format(duration2));
+    println!("Total duration: {}", duration_format(duration1 + duration2));
 }
 
 // PROBLEM 1 solution
