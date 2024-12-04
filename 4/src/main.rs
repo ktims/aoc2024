@@ -68,7 +68,7 @@ impl WordSearch {
     fn count_vertical(&self, needle: &str) -> u64 {
         let mut count = 0;
         for col in 0..self.rows[0].len() {
-            let s: String = self.rows.iter().map(|row| row.chars().nth(col).unwrap()).collect();
+            let s: String = self.rows.iter().map(|row| row.as_bytes()[col] as char).collect();
             count += Self::count_occurences(&s, needle)
         }
         count
@@ -82,21 +82,19 @@ impl WordSearch {
             for y in 0..height {
                 // check down-right
                 if x <= width - needle.len() && y <= height - needle.len() {
-                    let s: String = (0..needle.len())
+                    if (0..needle.len())
                         .into_iter()
-                        .map(|i| self.rows[y + i].chars().nth(x + i).unwrap())
-                        .collect();
-                    if s == needle {
+                        .all(|i| self.get(x + i, y + i) == needle.as_bytes()[i].into())
+                    {
                         count += 1
                     }
                 }
                 // check down-left
                 if x >= needle.len() - 1 && y <= height - needle.len() {
-                    let s: String = (0..needle.len())
+                    if (0..needle.len())
                         .into_iter()
-                        .map(|i| self.rows[y + i].chars().nth(x - i).unwrap())
-                        .collect();
-                    if s == needle {
+                        .all(|i| self.get(x - i, y + i) == needle.as_bytes()[i].into())
+                    {
                         count += 1
                     }
                 }
@@ -106,14 +104,15 @@ impl WordSearch {
     }
 
     fn get(&self, x: usize, y: usize) -> char {
-        self.rows[y].chars().nth(x).unwrap()
+        self.rows[y].as_bytes()[x].into()
     }
 
     fn count_x_mas(&self) -> u64 {
         // M.M M.S S.M S.S
         // .A. .A. .A. .A.
         // S.S M.S S.M M.M
-        let searches: [[char;5]; 4] = ["MMASS", "MSAMS", "SMASM", "SSAMM"].map(|s| s.chars().collect::<Vec<char>>().try_into().unwrap());
+        let searches: [[char; 5]; 4] =
+            ["MMASS", "MSAMS", "SMASM", "SSAMM"].map(|s| s.chars().collect::<Vec<char>>().try_into().unwrap());
         let width = self.rows[0].len();
         let height = self.rows.len();
 
