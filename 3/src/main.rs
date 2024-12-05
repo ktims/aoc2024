@@ -43,7 +43,8 @@ fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
     for line in input.map(|i| i.unwrap()) {
         let line = line.as_bytes();
         for m in re.captures_iter(line) {
-            sum +=  std::str::from_utf8(&m[1]).unwrap().parse::<u64>().unwrap() * std::str::from_utf8(&m[2]).unwrap().parse::<u64>().unwrap();
+            sum += std::str::from_utf8(&m[1]).unwrap().parse::<u64>().unwrap()
+                * std::str::from_utf8(&m[2]).unwrap().parse::<u64>().unwrap();
         }
     }
     sum
@@ -60,7 +61,10 @@ fn problem2<T: BufRead>(input: Lines<T>) -> u64 {
             match std::str::from_utf8(&m[1]).unwrap() {
                 "do()" => do_mul = true,
                 "don't()" => do_mul = false,
-                _ if do_mul => sum += std::str::from_utf8(&m[2]).unwrap().parse::<u64>().unwrap() * std::str::from_utf8(&m[3]).unwrap().parse::<u64>().unwrap(),
+                _ if do_mul => {
+                    sum += std::str::from_utf8(&m[2]).unwrap().parse::<u64>().unwrap()
+                        * std::str::from_utf8(&m[3]).unwrap().parse::<u64>().unwrap()
+                }
                 _ => {}
             }
         }
