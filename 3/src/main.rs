@@ -1,4 +1,4 @@
-use regex::Regex;
+use regex::bytes::Regex;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Lines};
 use std::time::{Duration, Instant};
@@ -39,10 +39,11 @@ fn main() {
 
 fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
     let mut sum = 0u64;
+    let re = Regex::new(r"(?-u)mul\((\d+),(\d+)\)").unwrap();
     for line in input.map(|i| i.unwrap()) {
-        let re = Regex::new(r"mul\((\d+),(\d+)\)").unwrap();
-        for m in re.captures_iter(&line) {
-            sum += m[1].parse::<u64>().unwrap() * m[2].parse::<u64>().unwrap();
+        let line = line.as_bytes();
+        for m in re.captures_iter(line) {
+            sum +=  std::str::from_utf8(&m[1]).unwrap().parse::<u64>().unwrap() * std::str::from_utf8(&m[2]).unwrap().parse::<u64>().unwrap();
         }
     }
     sum
@@ -52,13 +53,14 @@ fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
 fn problem2<T: BufRead>(input: Lines<T>) -> u64 {
     let mut sum = 0u64;
     let mut do_mul = true;
+    let re = Regex::new(r"(?-u)(do\(\)|don't\(\)|mul\((\d+),(\d+)\))").unwrap();
     for line in input.map(|i| i.unwrap()) {
-        let re = Regex::new(r"(do\(\)|don't\(\)|mul\((\d+),(\d+)\))").unwrap();
-        for m in re.captures_iter(&line) {
-            match &m[1] {
+        let line = line.as_bytes();
+        for m in re.captures_iter(line) {
+            match std::str::from_utf8(&m[1]).unwrap() {
                 "do()" => do_mul = true,
                 "don't()" => do_mul = false,
-                _ if do_mul => sum += m[2].parse::<u64>().unwrap() * m[3].parse::<u64>().unwrap(),
+                _ if do_mul => sum += std::str::from_utf8(&m[2]).unwrap().parse::<u64>().unwrap() * std::str::from_utf8(&m[3]).unwrap().parse::<u64>().unwrap(),
                 _ => {}
             }
         }
