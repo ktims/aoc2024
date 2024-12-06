@@ -1,7 +1,9 @@
+use bitflags::bitflags;
 use std::collections::{HashMap, HashSet};
-use std::fmt::Display;
+use std::fmt;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Lines};
+use std::ops::BitAnd;
 use std::time::{Duration, Instant};
 
 // BOILERPLATE
@@ -76,10 +78,44 @@ enum RunOutcome {
     Stuck,
 }
 
+bitflags! {
+    #[derive(Copy, Clone, Eq, PartialEq, Debug)]
+    pub struct DirectionSet: u8 {
+        const Up = 1;
+        const Down = 2;
+        const Left = 4;
+        const Right = 8;
+    }
+}
+
+impl From<FacingDirection> for DirectionSet {
+    fn from(value: FacingDirection) -> Self {
+        match value {
+            FacingDirection::Up => DirectionSet::Up,
+            FacingDirection::Down => DirectionSet::Down,
+            FacingDirection::Left => DirectionSet::Left,
+            FacingDirection::Right => DirectionSet::Right,
+        }
+    }
+}
+
+impl fmt::Display for DirectionSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl BitAnd<FacingDirection> for DirectionSet {
+    type Output = DirectionSet;
+    fn bitand(self, rhs: FacingDirection) -> Self::Output {
+        self & DirectionSet::from(rhs)
+    }
+}
+
 #[derive(Clone)]
 struct Map {
     grid: grid::Grid<u8>,
-    visited_from: HashMap<(i64, i64), HashSet<FacingDirection>>,
+    visited_from: grid::Grid<DirectionSet>,
     guard_facing: FacingDirection,
     guard_pos: (i64, i64),
 }
@@ -87,7 +123,8 @@ struct Map {
 impl<T: BufRead> From<Lines<T>> for Map {
     fn from(input: Lines<T>) -> Self {
         let grid = grid::Grid::from(input);
-        let visited_from = HashMap::new();
+        let mut visited_from: grid::Grid<DirectionSet> = grid::Grid::new(grid.width() as i64);
+        visited_from.data.resize(grid.data.len(), DirectionSet::empty());
         let guard_pos = grid.find(b'^').expect("Guard not found");
         let guard_facing = FacingDirection::Up;
         Self {
@@ -111,14 +148,19 @@ impl Map {
     /// Move one step in the facing direction, return if we are still inside the bounds
     fn step_guard(&mut self) -> StepOutcome {
         let new_pos = self.guard_facing.pos_ofs(self.guard_pos);
-        if self.visited_from.contains_key(&new_pos) && self.visited_from[&new_pos].contains(&self.guard_facing) {
+        if self
+            .visited_from
+            .get(new_pos.0, new_pos.1)
+            .is_some_and(|dirs| dirs.contains(self.guard_facing.into()))
+        {
             return StepOutcome::LoopFound;
         }
         if self.grid.set(new_pos.0, new_pos.1, b'X') {
-            self.visited_from
-                .entry(new_pos)
-                .or_insert(HashSet::new())
-                .insert(self.guard_facing);
+            self.visited_from.set(
+                new_pos.0,
+                new_pos.1,
+                self.visited_from.get(new_pos.0, new_pos.1).unwrap() | self.guard_facing.into(),
+            );
             self.guard_pos = new_pos;
             StepOutcome::Continue
         } else {
@@ -157,7 +199,6 @@ impl Map {
                     StepOutcome::LoopFound => return RunOutcome::LoopFound,
                     StepOutcome::Continue => {}
                 },
-                
             }
         }
         return RunOutcome::LeftMap;
