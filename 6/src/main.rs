@@ -216,21 +216,25 @@ fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
 // PROBLEM 2 solution
 fn problem2<T: BufRead>(input: Lines<T>) -> u64 {
     let input_map = Map::from(input);
+    // Use the solution from problem 1 to reduce the number of positions where obstacle placement will change the path
+    let mut part1 = input_map.clone();
+    part1.run_guard();
+
     let mut loop_count = 0u64;
-    for y in 0..input_map.grid.height() {
-        for x in 0..input_map.grid.width() {
-            match input_map.grid.get(x as i64, y as i64) {
-                Some(b'.') => {
-                    let mut test_map = input_map.clone();
-                    test_map.grid.set(x as i64, y as i64, b'#');
-                    if let RunOutcome::LoopFound = test_map.run_guard() {
-                        loop_count += 1
-                    }
-                }
-                _ => continue,
-            }
+    for pos in part1
+        .grid
+        .data
+        .iter()
+        .enumerate()
+        .filter_map(|(pos, c)| if *c == b'X' { Some(pos) } else { None })
+    {
+        let mut test_map = input_map.clone();
+        test_map.grid.data[pos] = b'#';
+        if let RunOutcome::LoopFound = test_map.run_guard() {
+            loop_count += 1
         }
     }
+
     loop_count
 }
 
