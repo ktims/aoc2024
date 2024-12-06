@@ -1,5 +1,4 @@
 use bitflags::bitflags;
-use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Lines};
@@ -58,10 +57,10 @@ impl FacingDirection {
     }
     fn pos_ofs(&self, pos: (i64, i64)) -> (i64, i64) {
         match self {
-            FacingDirection::Up => (pos.0 + 0, pos.1 + -1),
-            FacingDirection::Down => (pos.0 + 0, pos.1 + 1),
-            FacingDirection::Left => (pos.0 + -1, pos.1 + 0),
-            FacingDirection::Right => (pos.0 + 1, pos.1 + 0),
+            FacingDirection::Up => (pos.0, pos.1 + -1),
+            FacingDirection::Down => (pos.0, pos.1 + 1),
+            FacingDirection::Left => (pos.0 + -1, pos.1),
+            FacingDirection::Right => (pos.0 + 1, pos.1),
         }
     }
 }
@@ -201,7 +200,7 @@ impl Map {
                 },
             }
         }
-        return RunOutcome::LeftMap;
+        RunOutcome::LeftMap
     }
 }
 
@@ -209,7 +208,6 @@ impl Map {
 
 fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
     let mut map = Map::from(input);
-    eprintln!("problem 1");
     map.run_guard();
 
     (map.grid.count(b'X') + map.grid.count(b'-') + map.grid.count(b'|') + map.grid.count(b'^')) as u64
@@ -221,14 +219,12 @@ fn problem2<T: BufRead>(input: Lines<T>) -> u64 {
     let mut loop_count = 0u64;
     for y in 0..input_map.grid.height() {
         for x in 0..input_map.grid.width() {
-            eprintln!("Replacing ({}, {}) with obstacle", x, y);
             match input_map.grid.get(x as i64, y as i64) {
                 Some(b'.') => {
                     let mut test_map = input_map.clone();
                     test_map.grid.set(x as i64, y as i64, b'#');
-                    match test_map.run_guard() {
-                        RunOutcome::LoopFound => loop_count += 1,
-                        _ => {}
+                    if let RunOutcome::LoopFound = test_map.run_guard() {
+                        loop_count += 1
                     }
                 }
                 _ => continue,

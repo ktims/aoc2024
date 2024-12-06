@@ -1,11 +1,11 @@
 use std::{
     fmt::{self, Debug, Display, Formatter, Write},
-    io::{BufRead, Cursor, Lines},
+    io::{BufRead, Lines},
 };
 
 #[derive(Clone)]
 pub struct Grid<T> {
-    data: Vec<T>,
+    pub data: Vec<T>,
     width: i64,
 }
 
@@ -132,7 +132,7 @@ impl<T: Copy + Eq + PartialEq + Display + Debug> Display for Grid<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         for y in 0..self.height() {
             for x in 0..self.width() {
-                self.get(x as i64, y as i64).fmt(f);
+                self.get(x as i64, y as i64).fmt(f)?;
             }
         }
         f.write_char('\n')
