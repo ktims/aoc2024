@@ -3,6 +3,8 @@ use std::io::{BufRead, BufReader, Lines};
 use std::time::{Duration, Instant};
 
 use itertools::Itertools;
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use thread_local::ThreadLocal;
 
 // BOILERPLATE
 type InputIter = Lines<BufReader<File>>;
@@ -36,7 +38,7 @@ fn main() {
     println!("Total duration: {}", duration_format(duration1 + duration2));
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Calibration {
     result: u64,
     numbers: Vec<u64>,
@@ -55,9 +57,10 @@ impl From<&str> for Calibration {
 #[derive(Debug)]
 struct Calibrations {
     cals: Vec<Calibration>,
+    longest_cal: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum Operator {
     Add,
     Multiply,
@@ -69,7 +72,7 @@ impl Operator {
         match self {
             Operator::Add => a + b,
             Operator::Multiply => a * b,
-            Operator::Concatenate => u64::pow(10, b.to_string().len() as u32) * a + b,
+            Operator::Concatenate => u64::pow(10, u64::ilog10(b) + 1) * a + b,
         }
     }
 }
@@ -77,10 +80,55 @@ impl Operator {
 impl<T: BufRead> From<Lines<T>> for Calibrations {
     fn from(input: Lines<T>) -> Self {
         let mut cals = Vec::new();
+        let mut longest_cal = 0;
         for line in input.map(|l| l.unwrap()) {
-            cals.push(line.as_str().into());
+            let cal: Calibration = line.as_str().into();
+            longest_cal = std::cmp::max(longest_cal, cal.numbers.len());
+            cals.push(cal);
         }
-        Self { cals }
+        Self { cals, longest_cal }
+    }
+}
+
+impl Calibrations {
+    fn make_operator_sets(operators: &[Operator], n_opers: usize) -> Vec<Vec<Vec<Operator>>> {
+        (0..n_opers)
+            .map(|k| {
+                std::iter::repeat_n(operators.iter().map(|v| *v), k)
+                    .multi_cartesian_product()
+                    .collect()
+            })
+            .collect()
+    }
+    fn check_oper_set(cal: &Calibration, oper_set: &Vec<Operator>) -> bool {
+        let accum = oper_set
+            .iter()
+            .zip(cal.numbers.iter().skip(1))
+            .fold(cal.numbers[0], |accum, (oper, val)| oper.exec(accum, *val));
+        if accum == cal.result {
+            true
+        } else {
+            false
+        }
+    }
+    fn possible(&self, operators: &[Operator]) -> u64 {
+        let operator_sets = Calibrations::make_operator_sets(operators, self.longest_cal);
+        self.cals
+            .par_iter()
+            .map(|cal| {
+                let n_opers = cal.numbers.len() - 1;
+                let tl = ThreadLocal::new();
+                if operator_sets[n_opers]
+                    .par_iter()
+                    .find_any(|oper_set| Self::check_oper_set(&cal, &oper_set))
+                    .is_some()
+                {
+                    let cal_local = tl.get_or(|| cal.clone());
+                    return cal_local.result;
+                }
+                0
+            })
+            .sum()
     }
 }
 
@@ -88,56 +136,15 @@ impl<T: BufRead> From<Lines<T>> for Calibrations {
 
 fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
     let cals = Calibrations::from(input);
-    // println!("{:?}", cals);
-    let mut sum = 0;
-
     let operators = [Operator::Add, Operator::Multiply];
-
-    for cal in &cals.cals {
-        let n_opers = cal.numbers.len() - 1;
-        // println!("CAL: {:?} (opers: {})", cal, n_opers);
-        for oper_set in std::iter::repeat_n(operators.iter(), n_opers).multi_cartesian_product() {
-            // println!("operator set: {:?}", oper_set);
-            let mut accum = cal.numbers[0];
-            for (i, oper) in oper_set.iter().enumerate() {
-                // println!("Testing {} {:?} {}", accum, oper, cal.numbers[i+1]);
-                accum = oper.exec(accum, cal.numbers[i + 1]);
-            }
-            if accum == cal.result {
-                sum += cal.result;
-                // println!("Matched!");
-                break;
-            }
-        }
-        // println!("NO MATCHES");
-    }
-    sum
+    cals.possible(&operators)
 }
 
 // PROBLEM 2 solution
 fn problem2<T: BufRead>(input: Lines<T>) -> u64 {
     let cals = Calibrations::from(input);
-    let mut sum = 0;
     let operators = [Operator::Add, Operator::Multiply, Operator::Concatenate];
-    for cal in &cals.cals {
-        let n_opers = cal.numbers.len() - 1;
-        // println!("CAL: {:?} (opers: {})", cal, n_opers);
-        for oper_set in std::iter::repeat_n(operators.iter(), n_opers).multi_cartesian_product() {
-            // println!("operator set: {:?}", oper_set);
-            let mut accum = cal.numbers[0];
-            for (i, oper) in oper_set.iter().enumerate() {
-                // println!("Testing {} {:?} {}", accum, oper, cal.numbers[i+1]);
-                accum = oper.exec(accum, cal.numbers[i + 1]);
-            }
-            if accum == cal.result {
-                sum += cal.result;
-                // println!("Matched!");
-                break;
-            }
-        }
-        // println!("NO MATCHES");
-    }
-    sum
+    cals.possible(&operators)
 }
 
 #[cfg(test)]
