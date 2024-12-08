@@ -1,6 +1,7 @@
 use std::{
     fmt::{self, Debug, Display, Formatter, Write},
     io::{BufRead, Lines},
+    iter::repeat,
 };
 
 #[derive(Clone)]
@@ -16,6 +17,12 @@ impl<T: Copy + Eq + PartialEq + Display + Debug> Grid<T> {
             width,
         }
     }
+    pub fn with_shape(width: usize, height: usize, fill: T) -> Self {
+        Self {
+            data: Vec::from_iter(repeat(fill).take(width * height)),
+            width: width as i64,
+        }
+    }
     pub fn width(&self) -> usize {
         return self.width as usize;
     }
@@ -25,7 +32,7 @@ impl<T: Copy + Eq + PartialEq + Display + Debug> Grid<T> {
     fn pos(&self, x: i64, y: i64) -> i64 {
         y * self.width + x
     }
-    fn coord(&self, pos: i64) -> Option<(i64, i64)> {
+    pub fn coord(&self, pos: i64) -> Option<(i64, i64)> {
         if pos < 0 || pos >= self.data.len() as i64 {
             None
         } else {
