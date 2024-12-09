@@ -44,8 +44,15 @@ enum Unit {
     Free,
 }
 
+struct Inode {
+    id: usize,
+    pos: usize,
+    len: u8,
+}
+
 struct DiskMap {
     map: Vec<Unit>,
+    files: Vec<Inode>,
 }
 
 impl<T: BufRead> From<Lines<T>> for DiskMap {
@@ -54,21 +61,28 @@ impl<T: BufRead> From<Lines<T>> for DiskMap {
         let line = line_s.as_bytes();
         let mut file_id = 0;
         let mut map = Vec::new();
+        let mut files = Vec::new();
         for i in 0..line.len() {
+            let len = line[i] - b'0';
             if i % 2 == 0 {
                 // file
-                for _ in 0..line[i] - b'0' {
+                files.push(Inode {
+                    id: file_id,
+                    pos: map.len(),
+                    len,
+                });
+                for _ in 0..len {
                     map.push(Unit::File(file_id))
                 }
                 file_id += 1;
             } else {
                 // free
-                for _ in 0..line[i] - b'0' {
+                for _ in 0..len {
                     map.push(Unit::Free)
                 }
             }
         }
-        Self { map }
+        Self { map, files }
     }
 }
 
@@ -101,8 +115,6 @@ impl DiskMap {
 
 fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
     let mut map = DiskMap::from(input);
-    println!("{}", map);
-    println!();
     let mut i = map.map.len() - 1;
     while i != 0 {
         // find start index of 'file'
@@ -123,13 +135,15 @@ fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
             .map
             .iter()
             .enumerate()
-            .take(i + len)
+            .take(i + len + 1)
             .filter(|(_i, u)| **u == Unit::Free || **u == Unit::File(file_id))
             .map(|(i, _u)| i)
             .take(len)
             .collect_vec();
-        if frees[0] == i && i > 0 {
-            i -= 1;
+        if frees[0] >= i {
+            if i > 0 {
+                i -= 1;
+            }
             continue;
         }
         for j in 0..len {
@@ -139,30 +153,20 @@ fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
             i -= 1;
         }
     }
-    println!("{}", map);
     map.checksum()
 }
 
 // PROBLEM 2 solution
 fn problem2<T: BufRead>(input: Lines<T>) -> u64 {
     let mut map = DiskMap::from(input);
-    let mut i = map.map.len() - 1;
-    while i != 0 {
-        // find start index of 'file'
-        if map.map[i] == Unit::Free {
-            i -= 1;
-            continue;
-        };
-        let mut len = 1;
-        while i >= 1 && map.map[i] == map.map[i - 1] {
-            i -= 1;
-            len += 1;
-        }
+    // println!("before: {}", map);
+    for file in map.files.iter().rev() {
         let free_pos = map
             .map
-            .windows(len)
+            .windows(file.len as usize)
+            .take(file.pos)
             .enumerate()
-            .find(|(i, u)| {
+            .find(|(_i, u)| {
                 u.iter().all(|u| match u {
                     Unit::Free => true,
                     _ => false,
@@ -170,16 +174,16 @@ fn problem2<T: BufRead>(input: Lines<T>) -> u64 {
             })
             .map(|(i, _)| i);
         if let Some(free_pos) = free_pos {
-            for j in 0..len {
-                map.map[free_pos + j] = map.map[i + j];
-                map.map[i + j] = Unit::Free;
+            // println!("moving {}@{:?} to {}", file.id, file.pos, free_pos);
+            for j in 0..file.len {
+                map.map[free_pos + j as usize] = map.map[file.pos + j as usize];
+                map.map[file.pos + j as usize] = Unit::Free;
             }
-        }
-        if i > 0 {
-            i -= 1;
+            // println!("after:  {}", map);
         }
     }
-    0
+    // println!("after:  {}", map);
+    map.checksum()
 }
 
 #[cfg(test)]
@@ -198,6 +202,6 @@ mod tests {
     #[test]
     fn problem2_example() {
         let c = Cursor::new(EXAMPLE);
-        assert_eq!(problem2(c.lines()), 0);
+        assert_eq!(problem2(c.lines()), 2858);
     }
 }
