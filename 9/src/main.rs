@@ -115,42 +115,21 @@ impl DiskMap {
 
 fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
     let mut map = DiskMap::from(input);
-    let mut i = map.map.len() - 1;
-    while i != 0 {
-        // find start index of 'file'
-        if map.map[i] == Unit::Free {
-            i -= 1;
-            continue;
-        };
-        let mut len = 1;
-        while i >= 1 && map.map[i] == map.map[i - 1] {
-            i -= 1;
-            len += 1;
-        }
-        let file_id = match map.map[i] {
-            Unit::File(id) => id,
-            _ => panic!(),
-        };
+    for file in map.files.iter().rev() {
         let frees = map
             .map
             .iter()
             .enumerate()
-            .take(i + len + 1)
-            .filter(|(_i, u)| **u == Unit::Free || **u == Unit::File(file_id))
+            .take(file.pos + file.len as usize + 1)
+            .filter(|(_i, u)| **u == Unit::Free || **u == Unit::File(file.id))
             .map(|(i, _u)| i)
-            .take(len)
+            .take(file.len as usize)
             .collect_vec();
-        if frees[0] >= i {
-            if i > 0 {
-                i -= 1;
-            }
+        if frees[0] >= file.pos {
             continue;
         }
-        for j in 0..len {
-            map.map.swap(frees[j], i + j);
-        }
-        if i > 0 {
-            i -= 1;
+        for j in 0..file.len as usize {
+            map.map.swap(frees[j], file.pos + j);
         }
     }
     map.checksum()
