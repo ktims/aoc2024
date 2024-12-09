@@ -1,4 +1,3 @@
-use std::collections::LinkedList;
 use std::fmt::{Display, Write};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Lines};
@@ -53,6 +52,7 @@ struct Inode {
 struct DiskMap {
     map: Vec<Unit>,
     files: Vec<Inode>,
+    frees: Vec<Inode>,
 }
 
 impl<T: BufRead> From<Lines<T>> for DiskMap {
@@ -62,8 +62,9 @@ impl<T: BufRead> From<Lines<T>> for DiskMap {
         let mut file_id = 0;
         let mut map = Vec::new();
         let mut files = Vec::new();
-        for i in 0..line.len() {
-            let len = line[i] - b'0';
+        let mut frees = Vec::new();
+        for (i, c) in line.iter().enumerate() {
+            let len = c - b'0';
             if i % 2 == 0 {
                 // file
                 files.push(Inode {
@@ -77,12 +78,17 @@ impl<T: BufRead> From<Lines<T>> for DiskMap {
                 file_id += 1;
             } else {
                 // free
+                frees.push(Inode {
+                    id: 0,
+                    pos: map.len(),
+                    len,
+                });
                 for _ in 0..len {
                     map.push(Unit::Free)
                 }
             }
         }
-        Self { map, files }
+        Self { map, files, frees }
     }
 }
 
@@ -132,6 +138,7 @@ fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
             // if the first available free is > file.pos, it's fully packed, job done
             break;
         }
+        #[allow(clippy::needless_range_loop)]
         for j in 0..file.len as usize {
             map.map.swap(frees[j], file.pos + j);
         }
@@ -143,30 +150,27 @@ fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
 // PROBLEM 2 solution
 fn problem2<T: BufRead>(input: Lines<T>) -> u64 {
     let mut map = DiskMap::from(input);
-    // println!("before: {}", map);
     for file in map.files.iter().rev() {
-        let free_pos = map
-            .map
-            .windows(file.len as usize)
-            .take(file.pos)
-            .enumerate()
-            .find(|(_i, u)| {
-                u.iter().all(|u| match u {
-                    Unit::Free => true,
-                    _ => false,
-                })
-            })
-            .map(|(i, _)| i);
-        if let Some(free_pos) = free_pos {
-            // println!("moving {}@{:?} to {}", file.id, file.pos, free_pos);
-            for j in 0..file.len {
-                map.map[free_pos + j as usize] = map.map[file.pos + j as usize];
-                map.map[file.pos + j as usize] = Unit::Free;
+        let free = map.frees.iter_mut().find(|inode| inode.len >= file.len); // find the first entry in the free space map large enough
+        if let Some(free) = free {
+            if free.pos >= file.pos {
+                // if it's past our position, continue, but can't break since there might be free space for future files
+                continue;
             }
-            // println!("after:  {}", map);
+            for j in 0..file.len {
+                map.map.swap(free.pos + j as usize, file.pos + j as usize);
+            }
+            // Note: It is slightly faster to keep these hanging around in the free map with size = 0 then to remove them from the vec
+            free.len -= file.len;
+            free.pos += file.len as usize;
+
+            map.frees.push(Inode {
+                id: 0,
+                pos: file.pos,
+                len: file.len,
+            });
         }
     }
-    // println!("after:  {}", map);
     map.checksum()
 }
 
