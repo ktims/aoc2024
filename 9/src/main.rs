@@ -115,22 +115,27 @@ impl DiskMap {
 
 fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
     let mut map = DiskMap::from(input);
+    let mut last_free = 0;
     for file in map.files.iter().rev() {
         let frees = map
             .map
             .iter()
             .enumerate()
-            .take(file.pos + file.len as usize + 1)
-            .filter(|(_i, u)| **u == Unit::Free || **u == Unit::File(file.id))
+            .skip(last_free) // we greedy fill, so no need to check for free space before the last one we used
+            .take(file.pos + file.len as usize) // and we only need to search until the end of the current file
+            .filter(|(_i, u)| **u == Unit::Free || **u == Unit::File(file.id)) // look for free space or our existing space
             .map(|(i, _u)| i)
-            .take(file.len as usize)
+            .take(file.len as usize) // get the first file.len free blocks
             .collect_vec();
+        // Note: no need to test for too small frees list here, since we are guaranteed at worst to find our current position
         if frees[0] >= file.pos {
-            continue;
+            // if the first available free is > file.pos, it's fully packed, job done
+            break;
         }
         for j in 0..file.len as usize {
             map.map.swap(frees[j], file.pos + j);
         }
+        last_free = frees[file.len as usize - 1]
     }
     map.checksum()
 }
