@@ -58,9 +58,13 @@ impl TrailMap {
             .collect_vec()
     }
     fn count_reachable_from(&self, pos: &(i64, i64), needle: u8, visited: &mut Grid<bool>) -> u64 {
-        let our_val = self.map.get(pos.0, pos.1).unwrap();
-        if our_val == needle && visited.get(pos.0, pos.1) == Some(false) {
+        if visited.get(pos.0, pos.1) == Some(true) {
+            return 0;
+        } else {
             visited.set(pos.0, pos.1, true);
+        }
+        let our_val = self.map.get(pos.0, pos.1).unwrap();
+        if our_val == needle {
             return 1;
         } else if our_val == needle {
             return 0;
