@@ -57,47 +57,38 @@ impl TrailMap {
             .map(|(i, _v)| self.map.coord(i as i64).unwrap())
             .collect_vec()
     }
-    fn count_reachable_from(&self, pos: (i64, i64), needle: u8, visited: &mut Grid<bool>) -> u64 {
-        visited.set(pos.0, pos.1, true);
+    fn count_reachable_from(&self, pos: &(i64, i64), needle: u8, visited: &mut Grid<bool>) -> u64 {
+        let our_val = self.map.get(pos.0, pos.1).unwrap();
+        if our_val == needle && visited.get(pos.0, pos.1) == Some(false) {
+            visited.set(pos.0, pos.1, true);
+            return 1;
+        } else if our_val == needle {
+            return 0;
+        }
+        // adjacents that are +1
+        [(-1, 0), (1, 0), (0, -1), (0, 1)] // left, right, up, down
+            .iter()
+            .map(|(x_ofs, y_ofs)| (pos.0 + x_ofs, pos.1 + y_ofs)) // get target position
+            .map(|(x, y)| ((x, y), self.map.get(x, y))) // get value at that position
+            .filter(|(_, val)| *val == Some(our_val + 1)) // only interested if it's our value + 1
+            .map(|(pos, _)| pos) // discard the value
+            .map(|pos| self.count_reachable_from(&pos, needle, visited))
+            .sum()
+    }
+
+    fn count_paths_to(&self, pos: &(i64, i64), needle: u8) -> u64 {
         let our_val = self.map.get(pos.0, pos.1).unwrap();
         if our_val == needle {
             return 1;
         }
-        // adjacents that are +1
-        let valid_moves = [(-1, 0), (1, 0), (0, -1), (0, 1)] // left, right, up, down
+        [(-1, 0), (1, 0), (0, -1), (0, 1)] // left, right, up, down
             .iter()
             .map(|(x_ofs, y_ofs)| (pos.0 + x_ofs, pos.1 + y_ofs)) // get target position
-            .filter(|(x, y)| visited.get(*x, *y) == Some(false)) // skip already visited targets
             .map(|(x, y)| ((x, y), self.map.get(x, y))) // get value at that position
             .filter(|(_, val)| *val == Some(our_val + 1)) // only interested if it's our value + 1
             .map(|(pos, _)| pos) // discard the value
-            .collect_vec(); // need to collect since the next map will also require access to `visited`
-
-        valid_moves
-            .iter()
-            .map(|pos| self.count_reachable_from(*pos, needle, visited))
-            .sum()
-    }
-
-    fn paths_to(&self, pos: (i64, i64), needle: u8, mut path: Vec<(i64, i64)>) -> Vec<Vec<(i64, i64)>> {
-        path.push(pos);
-        let our_val = self.map.get(pos.0, pos.1).unwrap();
-        if our_val == needle {
-            return vec![path];
-        }
-        let valid_moves = [(-1, 0), (1, 0), (0, -1), (0, 1)] // left, right, up, down
-            .iter()
-            .map(|(x_ofs, y_ofs)| (pos.0 + x_ofs, pos.1 + y_ofs)) // get target position
-            .filter(|pos| !path.contains(pos)) // skip already visited targets
-            .map(|(x, y)| ((x, y), self.map.get(x, y))) // get value at that position
-            .filter(|(_, val)| *val == Some(our_val + 1)) // only interested if it's our value + 1
-            .map(|(pos, _)| pos) // discard the value
-            .collect_vec(); // need to collect since the next map will also require access to `visited`
-
-        valid_moves
-            .iter()
-            .flat_map(|mov| self.paths_to(*mov, needle, path.clone()))
-            .collect_vec()
+            .map(|mov| self.count_paths_to(&mov, needle))
+            .sum::<u64>() as u64
     }
 }
 
@@ -110,7 +101,7 @@ fn problem1<T: BufRead>(input: Lines<T>) -> u64 {
         .iter()
         .map(|pos| {
             let mut visited = Grid::with_shape(map.map.width(), map.map.height(), false);
-            map.count_reachable_from(*pos, b'9', &mut visited)
+            map.count_reachable_from(pos, b'9', &mut visited)
         })
         .sum()
 }
@@ -121,8 +112,8 @@ fn problem2<T: BufRead>(input: Lines<T>) -> u64 {
 
     map.trailheads()
         .iter()
-        .flat_map(|pos| map.paths_to(*pos, b'9', Vec::new()))
-        .count() as u64
+        .map(|pos| map.count_paths_to(pos, b'9'))
+        .sum::<u64>() as u64
 }
 
 #[cfg(test)]
