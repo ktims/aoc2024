@@ -1,8 +1,0 @@
-[package]
-name = "day6"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-bitflags = "2.6.0"
-grid = { version = "0.1.0", path = "../libs/grid" }

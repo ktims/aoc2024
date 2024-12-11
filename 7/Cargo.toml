@@ -1,9 +1,0 @@
-[package]
-name = "day7"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-itertools = "0.13.0"
-rayon = "1.10.0"
-thread_local = "1.1.8"
