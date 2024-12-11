@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Lines};
+use std::iter::repeat;
 use std::time::{Duration, Instant};
 
 use itertools::Itertools;
@@ -42,44 +43,65 @@ struct Stone {
     value: u64,
 }
 
+enum BlinkResult {
+    One(Stone),
+    Two(Stone, Stone),
+}
+
 impl Stone {
-    fn blink_once(self) -> Vec<Stone> {
+    fn blink_once(self) -> BlinkResult {
         let n_digits = if self.value == 0 { 1 } else { self.value.ilog10() + 1 };
         if self.value == 0 {
-            vec![Stone { value: 1 }]
+            BlinkResult::One(Stone { value: 1 })
         } else if n_digits % 2 == 0 {
             let parts = (
                 self.value / 10u64.pow(n_digits / 2),
                 self.value % 10u64.pow(n_digits / 2),
             );
-            vec![Stone { value: parts.0 }, Stone { value: parts.1 }]
+            BlinkResult::Two(Stone { value: parts.0 }, Stone { value: parts.1 })
         } else {
-            vec![Stone {
+            BlinkResult::One(Stone {
                 value: self.value * 2024,
-            }]
+            })
         }
     }
-    fn blink(self, times: usize) -> Vec<Stone> {
-        let mut stones = vec![self];
-        for _ in 0..times {
-            stones = stones.iter().flat_map(|stone| stone.blink_once()).collect();
-        }
-        stones
-    }
+    // #[allow(dead_code)]
+    // fn blink(self, times: usize) -> Vec<Stone> {
+    //     // Used in submitted part 1 solution
+    //     let mut stones = vec![self];
+    //     for _ in 0..times {
+    //         stones = stones.iter().flat_map(|stone| stone.blink_once()).collect();
+    //     }
+    //     stones
+    // }
 }
 
-fn count_blinks(stone: Stone, blinks: u64, cache: &mut HashMap<(u64, Stone), u64>) -> u64 {
-    if cache.contains_key(&(blinks, stone)) {
-        return cache[&(blinks, stone)];
+fn count_blinks(stone: Stone, blink: usize, cache: &mut Vec<HashMap<Stone, u64>>) -> u64 {
+    if cache[blink].contains_key(&stone) {
+        return cache[blink][&stone];
     }
     let stones = stone.blink_once();
-    let result = if blinks == 1 {
-        stones.len() as u64
+    let result = if blink == 0 {
+        match stones {
+            BlinkResult::One(_) => 1,
+            BlinkResult::Two(_, _) => 2,
+        }
     } else {
-        stones.iter().map(|s| count_blinks(*s, blinks - 1, cache)).sum()
+        match stones {
+            BlinkResult::One(s) => count_blinks(s, blink - 1, cache),
+            BlinkResult::Two(s1, s2) => count_blinks(s1, blink - 1, cache) + count_blinks(s2, blink - 1, cache),
+        }
     };
-    cache.insert((blinks, stone), result);
+    cache[blink].insert(stone, result);
     result
+}
+
+fn blink_stones(stones: &[Stone], blinks: usize) -> u64 {
+    let mut cache = Vec::from_iter(repeat(HashMap::new()).take(blinks));
+    stones
+        .iter()
+        .map(|stone| count_blinks(*stone, blinks - 1, &mut cache))
+        .sum()
 }
 
 // PROBLEM 1 solution
@@ -94,7 +116,7 @@ fn problem1<T: BufRead>(mut input: Lines<T>) -> u64 {
             value: v.parse().unwrap(),
         })
         .collect_vec();
-    stones.iter().flat_map(|stone| stone.blink(25)).count() as u64
+    blink_stones(&stones, 25)
 }
 
 // PROBLEM 2 solution
@@ -108,8 +130,7 @@ fn problem2<T: BufRead>(mut input: Lines<T>) -> u64 {
             value: v.parse().unwrap(),
         })
         .collect_vec();
-    let mut cache = HashMap::new();
-    stones.iter().map(|s| count_blinks(*s, 75, &mut cache)).sum()
+    blink_stones(&stones, 75)
 }
 
 #[cfg(test)]
