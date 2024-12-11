@@ -39,8 +39,18 @@ fn main() {
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-struct Stone {
-    value: u64,
+struct Stone(u64);
+struct Stones(Vec<Stone>);
+
+impl From<&str> for Stones {
+    fn from(input: &str) -> Self {
+        Stones(
+            input
+                .split_ascii_whitespace()
+                .map(|v| Stone(v.parse().unwrap()))
+                .collect_vec(),
+        )
+    }
 }
 
 enum BlinkResult {
@@ -50,30 +60,16 @@ enum BlinkResult {
 
 impl Stone {
     fn blink_once(self) -> BlinkResult {
-        let n_digits = if self.value == 0 { 1 } else { self.value.ilog10() + 1 };
-        if self.value == 0 {
-            BlinkResult::One(Stone { value: 1 })
+        let n_digits = if self.0 == 0 { 1 } else { self.0.ilog10() + 1 };
+        if self.0 == 0 {
+            BlinkResult::One(Stone(1))
         } else if n_digits % 2 == 0 {
-            let parts = (
-                self.value / 10u64.pow(n_digits / 2),
-                self.value % 10u64.pow(n_digits / 2),
-            );
-            BlinkResult::Two(Stone { value: parts.0 }, Stone { value: parts.1 })
+            let parts = (self.0 / 10u64.pow(n_digits / 2), self.0 % 10u64.pow(n_digits / 2));
+            BlinkResult::Two(Stone(parts.0), Stone(parts.1))
         } else {
-            BlinkResult::One(Stone {
-                value: self.value * 2024,
-            })
+            BlinkResult::One(Stone(self.0 * 2024))
         }
     }
-    // #[allow(dead_code)]
-    // fn blink(self, times: usize) -> Vec<Stone> {
-    //     // Used in submitted part 1 solution
-    //     let mut stones = vec![self];
-    //     for _ in 0..times {
-    //         stones = stones.iter().flat_map(|stone| stone.blink_once()).collect();
-    //     }
-    //     stones
-    // }
 }
 
 fn count_blinks(stone: Stone, blink: usize, cache: &mut Vec<HashMap<Stone, u64>>) -> u64 {
@@ -96,9 +92,10 @@ fn count_blinks(stone: Stone, blink: usize, cache: &mut Vec<HashMap<Stone, u64>>
     result
 }
 
-fn blink_stones(stones: &[Stone], blinks: usize) -> u64 {
+fn blink_stones(stones: &Stones, blinks: usize) -> u64 {
     let mut cache = Vec::from_iter(repeat(HashMap::new()).take(blinks));
     stones
+        .0
         .iter()
         .map(|stone| count_blinks(*stone, blinks - 1, &mut cache))
         .sum()
@@ -107,29 +104,13 @@ fn blink_stones(stones: &[Stone], blinks: usize) -> u64 {
 // PROBLEM 1 solution
 
 fn problem1<T: BufRead>(mut input: Lines<T>) -> u64 {
-    let stones = input
-        .next()
-        .unwrap()
-        .unwrap()
-        .split_ascii_whitespace()
-        .map(|v| Stone {
-            value: v.parse().unwrap(),
-        })
-        .collect_vec();
+    let stones = input.next().unwrap().unwrap().as_str().into();
     blink_stones(&stones, 25)
 }
 
 // PROBLEM 2 solution
 fn problem2<T: BufRead>(mut input: Lines<T>) -> u64 {
-    let stones = input
-        .next()
-        .unwrap()
-        .unwrap()
-        .split_ascii_whitespace()
-        .map(|v| Stone {
-            value: v.parse().unwrap(),
-        })
-        .collect_vec();
+    let stones = input.next().unwrap().unwrap().as_str().into();
     blink_stones(&stones, 75)
 }
 
