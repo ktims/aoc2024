@@ -37,7 +37,7 @@ fn main() {
     println!("Total duration: {}", duration_format(duration1 + duration2));
 }
 
-#[derive(Clone, Copy, Debug, Hash)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 struct Stone {
     value: u64,
 }
@@ -67,6 +67,21 @@ impl Stone {
         stones
     }
 }
+
+fn count_blinks(stone: Stone, blinks: u64, cache: &mut HashMap<(u64, Stone), u64>) -> u64 {
+    if cache.contains_key(&(blinks, stone)) {
+        return cache[&(blinks, stone)];
+    }
+    let stones = stone.blink_once();
+    let result = if blinks == 1 {
+        stones.len() as u64
+    } else {
+        stones.iter().map(|s| count_blinks(*s, blinks - 1, cache)).sum()
+    };
+    cache.insert((blinks, stone), result);
+    result
+}
+
 // PROBLEM 1 solution
 
 fn problem1<T: BufRead>(mut input: Lines<T>) -> u64 {
@@ -84,7 +99,17 @@ fn problem1<T: BufRead>(mut input: Lines<T>) -> u64 {
 
 // PROBLEM 2 solution
 fn problem2<T: BufRead>(mut input: Lines<T>) -> u64 {
-    0
+    let stones = input
+        .next()
+        .unwrap()
+        .unwrap()
+        .split_ascii_whitespace()
+        .map(|v| Stone {
+            value: v.parse().unwrap(),
+        })
+        .collect_vec();
+    let mut cache = HashMap::new();
+    stones.iter().map(|s| count_blinks(*s, 75, &mut cache)).sum()
 }
 
 #[cfg(test)]
@@ -103,6 +128,6 @@ mod tests {
     #[test]
     fn problem2_example() {
         let c = Cursor::new(EXAMPLE);
-        assert_eq!(problem2(c.lines()), 0);
+        assert_eq!(problem2(c.lines()), 65601038650482);
     }
 }
