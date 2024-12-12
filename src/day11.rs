@@ -1,4 +1,4 @@
-use aoc_runner_derive::{aoc, aoc_generator};
+use aoc_runner_derive::aoc;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::iter::repeat;
@@ -26,7 +26,6 @@ impl From<&str> for Stones {
     }
 }
 
-#[aoc_generator(day11)]
 fn parse(input: &str) -> Stones {
     Stones::from(input)
 }
@@ -47,8 +46,8 @@ impl Stone {
 }
 
 fn count_blinks(stone: &Stone, blink: usize, cache: &mut Vec<CacheType>) -> IntType {
-    if cache[blink].contains_key(&stone) {
-        return cache[blink][&stone].clone();
+    if cache[blink].contains_key(stone) {
+        return cache[blink][stone];
     }
     let stones = stone.blink_once();
     let result = if blink == 0 {
@@ -63,10 +62,10 @@ fn count_blinks(stone: &Stone, blink: usize, cache: &mut Vec<CacheType>) -> IntT
         }
     };
     cache[blink].insert(stone.clone(), result);
-    cache[blink][&stone].clone()
+    cache[blink][stone]
 }
 
-fn blink_stones(stones: &Stones, blinks: usize) -> IntType {
+fn blink_stones(stones: Stones, blinks: usize) -> IntType {
     let mut cache = Vec::from_iter(repeat(CacheType::new()).take(blinks));
     stones
         .0
@@ -76,12 +75,14 @@ fn blink_stones(stones: &Stones, blinks: usize) -> IntType {
 }
 
 #[aoc(day11, part1)]
-fn part1(stones: &Stones) -> IntType {
+pub fn part1(input: &str) -> IntType {
+    let stones = parse(input);
     blink_stones(stones, 25)
 }
 
 #[aoc(day11, part2)]
-fn part2(stones: &Stones) -> IntType {
+pub fn part2(input: &str) -> IntType {
+    let stones = parse(input);
     blink_stones(stones, 75)
 }
 
@@ -92,11 +93,11 @@ mod tests {
 
     #[test]
     fn part1_example() {
-        assert_eq!(part1(&parse(EXAMPLE)), 55312);
+        assert_eq!(part1(EXAMPLE), 55312);
     }
 
     #[test]
     fn part2_example() {
-        assert_eq!(part2(&parse(EXAMPLE)), 65601038650482);
+        assert_eq!(part2(EXAMPLE), 65601038650482);
     }
 }
