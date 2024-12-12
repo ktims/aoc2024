@@ -164,7 +164,7 @@ pub fn part1(map: &Map) -> u64 {
     let mut map = map.clone();
     map.run_guard::<false>();
 
-    map.grid.count(&b'X') as u64 + 1 // 'X' path positions + 1 starting position
+    map.grid.count(&b'X') as u64
 }
 
 // PROBLEM 2 solution
