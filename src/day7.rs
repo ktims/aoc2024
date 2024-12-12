@@ -2,7 +2,6 @@ use aoc_runner_derive::{aoc, aoc_generator};
 use itertools::Itertools;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::io::{BufRead, Lines};
-use thread_local::ThreadLocal;
 
 #[aoc_generator(day7)]
 pub fn get_input(input: &[u8]) -> Calibrations {
@@ -43,7 +42,7 @@ impl Operator {
         match self {
             Operator::Add => a + b,
             Operator::Multiply => a * b,
-            Operator::Concatenate => u64::pow(10, u64::ilog10(b) + 1) * a + b,
+            Operator::Concatenate => u64::pow(10, b.ilog10() + 1) * a + b,
         }
     }
 }
@@ -84,14 +83,12 @@ impl Calibrations {
             .par_iter()
             .map(|cal| {
                 let n_opers = cal.numbers.len() - 1;
-                let tl = ThreadLocal::new();
                 if operator_sets[n_opers]
                     .par_iter()
                     .find_any(|oper_set| Self::check_oper_set(cal, oper_set))
                     .is_some()
                 {
-                    let cal_local = tl.get_or(|| cal.clone());
-                    return cal_local.result;
+                    return cal.result;
                 }
                 0
             })
