@@ -18,26 +18,28 @@ impl From<&[u8]> for Farm {
 impl Farm {
     fn compute_region(&self, pos: &Coord2d, visited: &mut Grid<bool>) -> (u64, u64) {
         let our_plant = self.map.get(pos).unwrap();
-        let mut perimeter = 0;
-        let mut area = 1;
 
         visited.set(pos, true);
 
-        for adj in [(-1i64, 0i64), (1, 0), (0, -1), (0, 1)].map(|ofs| pos + ofs) {
-            match self.map.get(&adj) {
-                Some(plant) if plant == our_plant => {
-                    if visited.get(&adj) == Some(false) {
-                        // add the perimeter of the growth from there if not visited yet
-                        let (n_area, n_perimeter) = self.compute_region(&adj, visited);
-                        area += n_area;
-                        perimeter += n_perimeter;
+        [(-1i64, 0i64), (1, 0), (0, -1), (0, 1)]
+            .map(|ofs| pos + ofs)
+            .iter()
+            .fold((1, 0), |(area, perimeter), adj| {
+                match self.map.get(adj) {
+                    Some(plant) if plant == our_plant => {
+                        if visited.get(adj) == Some(false) {
+                            // add the perimeter of the growth from there if not visited yet
+                            let (add_area, add_perimeter) = self.compute_region(&adj, visited);
+                            (area + add_area, perimeter + add_perimeter)
+                        } else {
+                            (area, perimeter)
+                        }
                     }
+                    Some(_) | None => (area, perimeter + 1),
                 }
-                Some(_) | None => perimeter += 1,
-            }
-        }
-        (area, perimeter)
+            })
     }
+
     fn regions_cost(&self) -> u64 {
         let mut visited = Grid::with_shape(self.map.width(), self.map.height(), false);
         let mut cost = 0;
@@ -61,9 +63,10 @@ impl Farm {
         cost
     }
     fn count_corners(&self, pos: &Coord2d) -> u64 {
-        //  A
-        // AAA has 4 inside corners (pos at centre). check that  AA A's exist and B doesn't for each rotation
-        //  A                                                    AB
+        // NOTE: Iterating twice is faster than combining conditions in one pass
+        // BAB
+        // AAA has 4 inside corners (pos at centre). check that for AA A's exist and B doesn't for each rotation
+        // BAB                                                      AB
         let our_plant = self.map.get(pos);
         let inside_corners = [(1i64, 1i64), (-1, 1), (1, -1), (-1, -1)]
             .iter()
@@ -73,6 +76,9 @@ impl Farm {
                     && self.map.get(&(pos + (0, inside_corner.1))) == our_plant
             })
             .count();
+        // BBB
+        // BAB has 4 outside corners (pos at centre). check that for AB the  B are both not equal to A for each rot
+        // BBB                                                       BB     B
         let outside_corners = [(1i64, 1i64), (-1, 1), (1, -1), (-1, -1)]
             .iter()
             .filter(|outside_corner| {
@@ -84,25 +90,24 @@ impl Farm {
     }
     fn region_corners(&self, pos: &Coord2d, visited: &mut Grid<bool>) -> (u64, u64) {
         let our_plant = self.map.get(pos).unwrap();
-        let mut area = 1;
-        let mut corners = self.count_corners(pos);
 
         visited.set(pos, true);
 
-        for adj in [(-1i64, 0i64), (1, 0), (0, -1), (0, 1)].map(|ofs| pos + ofs) {
-            match self.map.get(&adj) {
-                Some(plant) if plant == our_plant => {
-                    if visited.get(&adj) == Some(false) {
-                        // add the perimeter of the growth from there if not visited yet
-                        let (n_area, n_corners) = self.region_corners(&adj, visited);
-                        area += n_area;
-                        corners += n_corners;
+        [(-1i64, 0i64), (1, 0), (0, -1), (0, 1)]
+            .map(|ofs| pos + ofs)
+            .iter()
+            .fold((1, self.count_corners(pos)), |(area, corners), adj| {
+                match self.map.get(adj) {
+                    Some(plant) if plant == our_plant => {
+                        if visited.get(adj) == Some(false) {
+                            // add the perimeter of the growth from there if not visited yet
+                            let (n_area, n_corners) = self.region_corners(&adj, visited);
+                            (area+n_area, corners+n_corners)
+                        } else { (area, corners) }
                     }
+                    Some(_) | None => { (area, corners) }
                 }
-                Some(_) | None => {}
-            }
-        }
-        (area, corners)
+            })
     }
     fn regions_discount_cost(&self) -> u64 {
         let mut visited = Grid::with_shape(self.map.width(), self.map.height(), false);
