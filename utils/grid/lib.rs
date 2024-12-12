@@ -2,9 +2,10 @@ use std::{
     fmt::{Debug, Display, Formatter, Write},
     io::{BufRead, Lines},
     iter::repeat,
+    ops::{Add, Sub},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Coord2d {
     pub x: i64,
     pub y: i64,
@@ -14,6 +15,26 @@ pub trait AsCoord2d {
     fn to_coord(self) -> Coord2d;
     fn x(&self) -> i64;
     fn y(&self) -> i64;
+}
+
+impl<T: AsCoord2d> Sub<T> for &Coord2d {
+    type Output = Coord2d;
+    fn sub(self, rhs: T) -> Self::Output {
+        Coord2d {
+            x: self.x() - rhs.x(),
+            y: self.y() - rhs.y(),
+        }
+    }
+}
+
+impl<T: AsCoord2d> Add<T> for &Coord2d {
+    type Output = Coord2d;
+    fn add(self, rhs: T) -> Self::Output {
+        Coord2d {
+            x: self.x() + rhs.x(),
+            y: self.y() + rhs.y(),
+        }
+    }
 }
 
 impl AsCoord2d for Coord2d {
@@ -37,6 +58,21 @@ impl AsCoord2d for (i64, i64) {
     }
     fn y(&self) -> i64 {
         self.1
+    }
+}
+
+impl AsCoord2d for (usize, usize) {
+    fn to_coord(self) -> Coord2d {
+        Coord2d {
+            x: self.0 as i64,
+            y: self.1 as i64,
+        }
+    }
+    fn x(&self) -> i64 {
+        self.0 as i64
+    }
+    fn y(&self) -> i64 {
+        self.1 as i64
     }
 }
 
