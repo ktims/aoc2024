@@ -1,29 +1,35 @@
 use aoc_runner_derive::{aoc, aoc_generator};
+use rustc_hash::FxHashMap;
+use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::io::BufRead;
+
+type HashMap<K, V> = FxHashMap<K, V>;
 
 #[aoc_generator(day5)]
 pub fn get_input(input: &[u8]) -> (OrderingRules, Vec<Vec<u64>>) {
     let mut lines = input.lines();
-    let rules = OrderingRules {
-        rules: lines
+
+    let pairs = HashMap::from_iter(
+        lines
             .by_ref()
             .map_while(|l| match l {
-                Ok(line) if !line.is_empty() => Some(Box::new(BeforeRule::from(line)) as _),
+                Ok(line) if !line.is_empty() => {
+                    let rule = BeforeRule::from(line);
+                    Some(vec![
+                        ((rule.a, rule.b), Ordering::Less),
+                        ((rule.b, rule.a), Ordering::Greater),
+                    ])
+                }
                 _ => None,
             })
-            .collect(),
-    };
+            .flatten(),
+    );
     let updates: Vec<Vec<u64>> = lines
         .by_ref()
         .map(|l| l.unwrap().split(',').map(|n| n.parse::<u64>().unwrap()).collect())
         .collect();
-    (rules, updates)
-}
-
-trait Rule: Debug {
-    fn check(&self, pages: &[u64]) -> bool;
-    fn fail_pos(&self, pages: &[u64]) -> Option<(usize, usize)>;
+    (OrderingRules { pairs }, updates)
 }
 
 #[derive(Debug)]
@@ -32,69 +38,37 @@ struct BeforeRule {
     b: u64,
 }
 
-impl Rule for BeforeRule {
-    fn check(&self, pages: &[u64]) -> bool {
-        let mut seen_a = false;
-        let mut seen_b = false;
-        for page in pages {
-            if *page == self.a {
-                if seen_b {
-                    return false;
-                }
-                seen_a = true;
-            } else if *page == self.b {
-                if seen_a {
-                    return true;
-                }
-                seen_b = true
-            }
-        }
-        true
-    }
-    fn fail_pos(&self, pages: &[u64]) -> Option<(usize, usize)> {
-        let mut a_pos = None;
-        let mut b_pos = None;
-        for (pos, page) in pages.iter().enumerate() {
-            if *page == self.a {
-                if let Some(b_pos) = b_pos {
-                    return Some((b_pos, pos));
-                }
-                a_pos = Some(pos);
-            } else if *page == self.b {
-                if a_pos.is_some() {
-                    return None;
-                }
-                b_pos = Some(pos);
-            }
-        }
-        None
-    }
-}
-
 impl From<String> for BeforeRule {
     fn from(line: String) -> BeforeRule {
-        let nums: Vec<_> = line.splitn(2, '|').map(|s| s.parse::<u64>().unwrap()).collect();
-        BeforeRule { a: nums[0], b: nums[1] }
+        let nums = line.split_once('|').unwrap();
+        BeforeRule {
+            a: nums.0.parse().unwrap(),
+            b: nums.1.parse().unwrap(),
+        }
     }
 }
 
 #[derive(Debug)]
 pub struct OrderingRules {
-    rules: Vec<Box<dyn Rule>>,
+    pairs: HashMap<(u64, u64), Ordering>,
 }
 
 impl OrderingRules {
     fn check(&self, pages: &[u64]) -> bool {
-        self.rules.iter().all(|p| p.check(pages))
+        pages.is_sorted_by(|a, b| self.is_sorted(*a, *b))
     }
-    fn fail_pos(&self, pages: &[u64]) -> Option<(usize, usize)> {
-        for rule in &self.rules {
-            let fail_pos = rule.fail_pos(pages);
-            if fail_pos.is_some() {
-                return fail_pos;
-            }
+    fn cmp(&self, a: u64, b: u64) -> Ordering {
+        if let Some(ord) = self.pairs.get(&(a, b)) {
+            *ord
+        } else {
+            Ordering::Equal
         }
-        None
+    }
+    fn is_sorted(&self, a: u64, b: u64) -> bool {
+        match self.pairs.get(&(a, b)) {
+            Some(Ordering::Less) | Some(Ordering::Equal) => true,
+            _ => false,
+        }
     }
 }
 
@@ -111,35 +85,25 @@ impl OrderingRules {
 // PROBLEM 1 solution
 #[aoc(day5, part1)]
 pub fn part1((rules, updates): &(OrderingRules, Vec<Vec<u64>>)) -> u64 {
-    let mut res = 0;
-    for update in updates {
-        if rules.check(update) {
-            res += update[update.len() / 2]
-        }
-    }
-    res
+    updates
+        .iter()
+        .filter(|update| rules.check(update))
+        .map(|update| update[update.len() / 2])
+        .sum()
 }
 
 // PROBLEM 2 solution
 #[aoc(day5, part2)]
 pub fn part2((rules, updates): &(OrderingRules, Vec<Vec<u64>>)) -> u64 {
     let mut updates = updates.clone();
-    let mut res = 0;
-    for update in updates.as_mut_slice() {
-        let mut did_swaps = false;
-        while let Some((a, b)) = rules.fail_pos(update) {
-            did_swaps = true;
-            update.swap(a, b);
-        }
-        if did_swaps {
-            if !rules.check(update) {
-                panic!("update still fails after swaps")
-            }
-
-            res += update[update.len() / 2];
-        }
-    }
-    res
+    updates
+        .iter_mut()
+        .filter(|update| !rules.check(update))
+        .map(|update| {
+            update.sort_by(|a, b| rules.cmp(*a, *b));
+            update[update.len() / 2]
+        })
+        .sum()
 }
 
 #[cfg(test)]
