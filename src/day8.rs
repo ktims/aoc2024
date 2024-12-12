@@ -43,7 +43,7 @@ impl AntennaMap {
                 let offset = (a.0 - b.0, a.1 - b.1);
                 for i in (start..).map_while(|i| if Some(i - start) != reps { Some(i as i64) } else { None }) {
                     let node_pos = (a.0 + i * offset.0, a.1 + i * offset.1);
-                    if !antinodes.set(node_pos.0, node_pos.1, true) {
+                    if antinodes.set(&node_pos, true).is_none() {
                         // left the grid
                         break;
                     }
@@ -58,14 +58,14 @@ impl AntennaMap {
 #[aoc(day8, part1)]
 pub fn part1(map: &AntennaMap) -> u64 {
     let antinodes = map.find_antinodes(1, Some(1));
-    antinodes.count(true) as u64
+    antinodes.count(&true) as u64
 }
 
 // PROBLEM 2 solution
 #[aoc(day8, part2)]
 pub fn part2(map: &AntennaMap) -> u64 {
     let antinodes = map.find_antinodes(0, None);
-    antinodes.count(true) as u64
+    antinodes.count(&true) as u64
 }
 
 #[cfg(test)]

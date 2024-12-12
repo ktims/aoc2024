@@ -5,6 +5,42 @@ use std::{
 };
 
 #[derive(Clone)]
+pub struct Coord2d {
+    pub x: i64,
+    pub y: i64,
+}
+
+pub trait AsCoord2d {
+    fn to_coord(self) -> Coord2d;
+    fn x(&self) -> i64;
+    fn y(&self) -> i64;
+}
+
+impl AsCoord2d for Coord2d {
+    fn to_coord(self) -> Coord2d {
+        self
+    }
+    fn x(&self) -> i64 {
+        self.x
+    }
+    fn y(&self) -> i64 {
+        self.y
+    }
+}
+
+impl AsCoord2d for (i64, i64) {
+    fn to_coord(self) -> Coord2d {
+        Coord2d { x: self.0, y: self.1 }
+    }
+    fn x(&self) -> i64 {
+        self.0
+    }
+    fn y(&self) -> i64 {
+        self.1
+    }
+}
+
+#[derive(Clone)]
 pub struct Grid<T> {
     pub data: Vec<T>,
     width: i64,
@@ -29,8 +65,8 @@ impl<T: Copy + Eq + PartialEq + Display + Debug> Grid<T> {
     pub fn height(&self) -> usize {
         return self.data.len() / self.width();
     }
-    fn pos(&self, x: i64, y: i64) -> i64 {
-        y * self.width + x
+    fn pos<C: AsCoord2d>(&self, c: &C) -> i64 {
+        c.y() * self.width + c.x()
     }
     pub fn coord(&self, pos: i64) -> Option<(i64, i64)> {
         if pos < 0 || pos >= self.data.len() as i64 {
@@ -39,57 +75,58 @@ impl<T: Copy + Eq + PartialEq + Display + Debug> Grid<T> {
             Some((pos % self.width, pos / self.width))
         }
     }
-    fn valid_pos(&self, x: i64, y: i64) -> Option<usize> {
-        if x < 0 || x >= self.width {
+    fn valid_pos<C: AsCoord2d>(&self, c: &C) -> Option<usize> {
+        if c.x() < 0 || c.x() >= self.width {
             return None;
         }
-        if y < 0 || y >= self.data.len() as i64 / self.width {
+        if c.y() < 0 || c.y() >= self.data.len() as i64 / self.width {
             return None;
         }
-        let pos = self.pos(x, y);
+        let pos = self.pos(c);
         if pos < 0 || pos as usize >= self.data.len() {
             return None;
         }
-        self.pos(x, y).try_into().ok()
+        self.pos(c).try_into().ok()
     }
-    pub fn get(&self, x: i64, y: i64) -> Option<T> {
-        match self.valid_pos(x, y) {
+    pub fn get<C: AsCoord2d>(&self, c: &C) -> Option<T> {
+        match self.valid_pos(c) {
             Some(pos) => Some(self.data[pos]),
             None => None,
         }
     }
-    pub fn set(&mut self, x: i64, y: i64, val: T) -> bool {
-        match self.valid_pos(x, y) {
+    pub fn set<C: AsCoord2d>(&mut self, c: &C, val: T) -> Option<T> {
+        match self.valid_pos(c) {
             Some(pos) => {
+                let res = Some(self.data[pos]);
                 self.data[pos] = val;
-                true
+                res
             }
-            None => false,
+            None => None,
         }
     }
     pub fn row(&self, y: i64) -> Option<&[T]> {
         if y < self.height() as i64 {
-            Some(&self.data[self.pos(0, y) as usize..self.pos(self.width, y) as usize])
+            Some(&self.data[self.pos(&(0, y)) as usize..self.pos(&(self.width, y)) as usize])
         } else {
             None
         }
     }
 
-    pub fn find(&self, haystack: T) -> Option<(i64, i64)> {
+    pub fn find(&self, haystack: &T) -> Option<(i64, i64)> {
         self.coord(
             self.data
                 .iter()
                 .enumerate()
-                .find_map(|(pos, val)| if *val == haystack { Some(pos as i64) } else { None })
+                .find_map(|(pos, val)| if val == haystack { Some(pos as i64) } else { None })
                 .unwrap_or(-1),
         )
     }
-    pub fn count(&self, haystack: T) -> usize {
-        self.data.iter().filter(|item| **item == haystack).count()
+    pub fn count(&self, haystack: &T) -> usize {
+        self.data.iter().filter(|item| *item == haystack).count()
     }
 
-    pub fn forward_slice(&self, x: i64, y: i64, len: i64) -> Option<&[T]> {
-        let pos = (self.valid_pos(x, y), self.valid_pos(x + len - 1, y));
+    pub fn forward_slice<C: AsCoord2d>(&self, start: &C, len: i64) -> Option<&[T]> {
+        let pos = (self.valid_pos(start), self.valid_pos(&(start.x() + len - 1, start.y())));
         match pos {
             (Some(pos1), Some(pos2)) => Some(&self.data[pos1..pos2 + 1]),
             _ => None,
@@ -151,7 +188,7 @@ impl Display for Grid<u8> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for y in 0..self.height() {
             for x in 0..self.width() {
-                f.write_fmt(format_args!("{}",self.get(x as i64, y as i64).unwrap() as char))?;
+                f.write_fmt(format_args!("{}", self.get(&(x as i64, y as i64)).unwrap() as char))?;
             }
             f.write_char('\n')?;
         }
@@ -181,21 +218,21 @@ FBCG";
     #[test]
     fn indexing() {
         let grid = unchecked_load();
-        assert_eq!(grid.get(0, 0), Some(b'A'));
-        assert_eq!(grid.get(3, 3), Some(b'G'));
-        assert_eq!(grid.get(-1, 0), None);
-        assert_eq!(grid.get(0, -1), None);
-        assert_eq!(grid.get(5, 0), None);
-        assert_eq!(grid.get(0, 5), None);
+        assert_eq!(grid.get(&(0, 0)), Some(b'A'));
+        assert_eq!(grid.get(&(3, 3)), Some(b'G'));
+        assert_eq!(grid.get(&(-1, 0)), None);
+        assert_eq!(grid.get(&(0, -1)), None);
+        assert_eq!(grid.get(&(5, 0)), None);
+        assert_eq!(grid.get(&(0, 5)), None);
     }
 
     #[test]
     fn forward_slice() {
         let grid = unchecked_load();
-        assert_eq!(grid.forward_slice(0, 0, 2), Some(b"AB".as_slice()));
-        assert_eq!(grid.forward_slice(2, 0, 2), Some(b"CD".as_slice()));
-        assert_eq!(grid.forward_slice(2, 0, 3), None);
-        assert_eq!(grid.forward_slice(0, 2, 4), Some(b"IJKL".as_slice()));
+        assert_eq!(grid.forward_slice(&(0, 0), 2), Some(b"AB".as_slice()));
+        assert_eq!(grid.forward_slice(&(2, 0), 2), Some(b"CD".as_slice()));
+        assert_eq!(grid.forward_slice(&(2, 0), 3), None);
+        assert_eq!(grid.forward_slice(&(0, 2), 4), Some(b"IJKL".as_slice()));
     }
 
     #[test]

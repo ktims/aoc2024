@@ -29,12 +29,12 @@ impl TrailMap {
             .collect_vec()
     }
     fn count_reachable_from(&self, pos: &(i64, i64), needle: u8, visited: &mut Grid<bool>) -> u64 {
-        if visited.get(pos.0, pos.1) == Some(true) {
+        if visited.get(pos) == Some(true) {
             return 0;
         } else {
-            visited.set(pos.0, pos.1, true);
+            visited.set(pos, true);
         }
-        let our_val = self.map.get(pos.0, pos.1).unwrap();
+        let our_val = self.map.get(pos).unwrap();
         if our_val == needle {
             return 1;
         }
@@ -42,7 +42,7 @@ impl TrailMap {
         [(-1, 0), (1, 0), (0, -1), (0, 1)] // left, right, up, down
             .iter()
             .map(|(x_ofs, y_ofs)| (pos.0 + x_ofs, pos.1 + y_ofs)) // get target position
-            .map(|(x, y)| ((x, y), self.map.get(x, y))) // get value at that position
+            .map(|target_pos| (target_pos, self.map.get(&target_pos))) // get value at that position
             .filter(|(_, val)| *val == Some(our_val + 1)) // only interested if it's our value + 1
             .map(|(pos, _)| pos) // discard the value
             .map(|pos| self.count_reachable_from(&pos, needle, visited))
@@ -50,14 +50,14 @@ impl TrailMap {
     }
 
     fn count_paths_to(&self, pos: &(i64, i64), needle: u8) -> u64 {
-        let our_val = self.map.get(pos.0, pos.1).unwrap();
+        let our_val = self.map.get(pos).unwrap();
         if our_val == needle {
             return 1;
         }
         [(-1, 0), (1, 0), (0, -1), (0, 1)] // left, right, up, down
             .iter()
             .map(|(x_ofs, y_ofs)| (pos.0 + x_ofs, pos.1 + y_ofs)) // get target position
-            .map(|(x, y)| ((x, y), self.map.get(x, y))) // get value at that position
+            .map(|target_pos| (target_pos, self.map.get(&target_pos))) // get value at that position
             .filter(|(_, val)| *val == Some(our_val + 1)) // only interested if it's our value + 1
             .map(|(pos, _)| pos) // discard the value
             .map(|mov| self.count_paths_to(&mov, needle))

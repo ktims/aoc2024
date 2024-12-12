@@ -1,5 +1,7 @@
 use aoc_runner_derive::{aoc, aoc_generator};
 use bitflags::bitflags;
+use rayon::iter::ParallelIterator;
+use rayon::slice::ParallelSlice;
 use std::fmt;
 use std::io::{BufRead, Lines};
 use std::ops::BitAnd;
@@ -14,10 +16,10 @@ pub fn get_input(input: &[u8]) -> Map {
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 enum FacingDirection {
-    Up = b'^',
-    Down = b'v',
-    Left = b'<',
-    Right = b'>',
+    Up = 1,
+    Down = 2,
+    Left = 4,
+    Right = 8,
 }
 
 impl FacingDirection {
@@ -45,6 +47,7 @@ enum StepOutcome {
     Continue,
 }
 
+#[derive(Eq, PartialEq)]
 enum RunOutcome {
     LeftMap,
     LoopFound,
@@ -98,7 +101,7 @@ impl<T: BufRead> From<Lines<T>> for Map {
         let grid = Grid::from(input);
         let mut visited_from: Grid<DirectionSet> = Grid::new(grid.width() as i64);
         visited_from.data.resize(grid.data.len(), DirectionSet::empty());
-        let guard_pos = grid.find(b'^').expect("Guard not found");
+        let guard_pos = grid.find(&b'^').expect("Guard not found");
         let guard_facing = FacingDirection::Up;
         Self {
             grid,
@@ -112,31 +115,24 @@ impl<T: BufRead> From<Lines<T>> for Map {
 
 impl Map {
     fn look(&self, dir: &FacingDirection) -> Option<u8> {
-        match dir {
-            FacingDirection::Up => self.grid.get(self.guard_pos.0, self.guard_pos.1 - 1),
-            FacingDirection::Down => self.grid.get(self.guard_pos.0, self.guard_pos.1 + 1),
-            FacingDirection::Left => self.grid.get(self.guard_pos.0 - 1, self.guard_pos.1),
-            FacingDirection::Right => self.grid.get(self.guard_pos.0 + 1, self.guard_pos.1),
-        }
+        self.grid.get(&dir.pos_ofs(self.guard_pos))
     }
     /// Move one step in the facing direction, return if we are still inside the bounds
     fn step_guard<const RECORD_PATH: bool>(&mut self) -> StepOutcome {
         let new_pos = self.guard_facing.pos_ofs(self.guard_pos);
         if self
             .visited_from
-            .get(new_pos.0, new_pos.1)
+            .get(&new_pos)
             .is_some_and(|dirs| dirs.contains(self.guard_facing.into()))
         {
-            return StepOutcome::LoopFound;
-        }
-        if self.grid.set(new_pos.0, new_pos.1, b'X') {
+            StepOutcome::LoopFound
+        } else if self.grid.set(&new_pos, b'X').is_some() {
             if RECORD_PATH {
                 self.path.push((new_pos, self.guard_facing));
             }
             self.visited_from.set(
-                new_pos.0,
-                new_pos.1,
-                self.visited_from.get(new_pos.0, new_pos.1).unwrap() | self.guard_facing.into(),
+                &new_pos,
+                self.visited_from.get(&new_pos).unwrap() | self.guard_facing.into(),
             );
             self.guard_pos = new_pos;
             StepOutcome::Continue
@@ -168,7 +164,7 @@ pub fn part1(map: &Map) -> u64 {
     let mut map = map.clone();
     map.run_guard::<false>();
 
-    (map.grid.count(b'X') + map.grid.count(b'-') + map.grid.count(b'|') + map.grid.count(b'^')) as u64
+    map.grid.count(&b'X') as u64 + 1 // 'X' path positions + 1 starting position
 }
 
 // PROBLEM 2 solution
@@ -178,28 +174,19 @@ pub fn part2(input_map: &Map) -> u64 {
     let mut path_map = input_map.clone();
     path_map.run_guard::<true>();
 
-    let mut tested_position: grid::Grid<bool> = grid::Grid::new(path_map.grid.width() as i64);
-    tested_position.data.resize(path_map.grid.data.len(), false);
-
-    let mut loop_count = 0u64;
-    let mut last_posdir = (input_map.guard_pos, input_map.guard_facing);
-
-    for ((x, y), dir) in path_map.path.iter() {
-        if !tested_position.get(*x, *y).unwrap() {
-            tested_position.set(*x, *y, true);
+    path_map
+        .path
+        .par_windows(2)
+        .filter(|prev_cur| {
+            let last_posdir = prev_cur[0];
             let mut test_map = input_map.clone();
-            test_map.grid.set(*x, *y, b'#');
+            test_map.grid.set(&prev_cur[1].0, b'#').unwrap();
             test_map.guard_pos = last_posdir.0;
             test_map.guard_facing = last_posdir.1;
 
-            if let RunOutcome::LoopFound = test_map.run_guard::<false>() {
-                loop_count += 1
-            }
-            last_posdir = ((*x, *y), *dir);
-        }
-    }
-
-    loop_count
+            test_map.run_guard::<false>() == RunOutcome::LoopFound
+        })
+        .count() as u64
 }
 
 #[cfg(test)]
