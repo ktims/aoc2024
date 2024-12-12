@@ -11,6 +11,7 @@ grid = { version = "0.1.0", path = "utils/grid" }
 itertools = "0.13.0"
 rayon = "1.10.0"
 regex = "1.11.1"
+rustc-hash = "2.1.0"
 thread_local = "1.1.8"
 
 [profile.release]

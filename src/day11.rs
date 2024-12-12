@@ -1,10 +1,10 @@
 use aoc_runner_derive::aoc;
 use itertools::Itertools;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::iter::repeat;
 
 type IntType = u64;
-type CacheType = HashMap<Stone, IntType>;
+type CacheType = FxHashMap<Stone, IntType>;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 struct Stone(IntType);
@@ -66,7 +66,7 @@ fn count_blinks(stone: &Stone, blink: usize, cache: &mut Vec<CacheType>) -> IntT
 }
 
 fn blink_stones(stones: Stones, blinks: usize) -> IntType {
-    let mut cache = Vec::from_iter(repeat(CacheType::new()).take(blinks));
+    let mut cache = Vec::from_iter(repeat(CacheType::default()).take(blinks));
     stones
         .0
         .iter()

@@ -1,8 +1,10 @@
 use aoc_runner_derive::{aoc, aoc_generator};
 use grid::Grid;
 use itertools::Itertools;
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 use std::io::BufRead;
+
+type HashSet<T> = FxHashSet<T>;
 
 #[aoc_generator(day8)]
 pub fn get_input(input: &[u8]) -> AntennaMap {

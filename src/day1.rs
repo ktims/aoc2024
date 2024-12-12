@@ -1,6 +1,8 @@
 use aoc_runner_derive::{aoc, aoc_generator};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::io::{BufRead, Lines};
+
+type HashMap<K, V> = FxHashMap<K, V>;
 
 #[aoc_generator(day1)]
 pub fn get_input(input: &[u8]) -> Locations {
@@ -32,7 +34,7 @@ impl Locations {
         self.right.sort();
     }
     fn right_count(&self) -> HashMap<u64, u64> {
-        let mut right_count: HashMap<u64, u64> = HashMap::new();
+        let mut right_count: HashMap<u64, u64> = HashMap::default();
         for rval in &self.right {
             right_count.insert(*rval, *right_count.get(rval).unwrap_or(&0) + 1);
         }
