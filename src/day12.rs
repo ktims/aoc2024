@@ -1,5 +1,3 @@
-use std::io::BufRead;
-
 use aoc_runner_derive::{aoc, aoc_generator};
 use grid::{Coord2d, Grid};
 
@@ -10,7 +8,7 @@ pub struct Farm {
 impl From<&[u8]> for Farm {
     fn from(input: &[u8]) -> Self {
         Self {
-            map: Grid::from(input.lines()),
+            map: Grid::from(input),
         }
     }
 }
@@ -27,9 +25,9 @@ impl Farm {
             .fold((1, 0), |(area, perimeter), adj| {
                 match self.map.get(adj) {
                     Some(plant) if plant == our_plant => {
-                        if visited.get(adj) == Some(false) {
+                        if visited.get(adj) == Some(&false) {
                             // add the perimeter of the growth from there if not visited yet
-                            let (add_area, add_perimeter) = self.compute_region(&adj, visited);
+                            let (add_area, add_perimeter) = self.compute_region(adj, visited);
                             (area + add_area, perimeter + add_perimeter)
                         } else {
                             (area, perimeter)
@@ -99,9 +97,9 @@ impl Farm {
             .fold((1, self.count_corners(pos)), |(area, corners), adj| {
                 match self.map.get(adj) {
                     Some(plant) if plant == our_plant => {
-                        if visited.get(adj) == Some(false) {
+                        if visited.get(adj) == Some(&false) {
                             // add the perimeter of the growth from there if not visited yet
-                            let (n_area, n_corners) = self.region_corners(&adj, visited);
+                            let (n_area, n_corners) = self.region_corners(adj, visited);
                             (area+n_area, corners+n_corners)
                         } else { (area, corners) }
                     }
@@ -110,7 +108,7 @@ impl Farm {
             })
     }
     fn regions_discount_cost(&self) -> u64 {
-        let mut visited = Grid::with_shape(self.map.width(), self.map.height(), false);
+        let mut visited = self.map.same_shape(false);
         let mut cost = 0;
         for y in 0..self.map.height() {
             for x in 0..self.map.width() {

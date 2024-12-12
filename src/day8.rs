@@ -2,19 +2,19 @@ use aoc_runner_derive::{aoc, aoc_generator};
 use grid::Grid;
 use itertools::Itertools;
 use std::collections::HashSet;
-use std::io::{BufRead, Lines};
+use std::io::BufRead;
 
 #[aoc_generator(day8)]
 pub fn get_input(input: &[u8]) -> AntennaMap {
-    AntennaMap::from(input.lines())
+    AntennaMap::from(input)
 }
 
 pub struct AntennaMap {
     map: Grid<u8>,
 }
 
-impl<T: BufRead> From<Lines<T>> for AntennaMap {
-    fn from(input: Lines<T>) -> Self {
+impl<T: BufRead> From<T> for AntennaMap {
+    fn from(input: T) -> Self {
         Self { map: Grid::from(input) }
     }
 }

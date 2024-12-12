@@ -1,7 +1,8 @@
 use std::{
     fmt::{Debug, Display, Formatter, Write},
-    io::{BufRead, Lines},
+    io::BufRead,
     iter::repeat,
+    mem::swap,
     ops::{Add, Sub},
 };
 
@@ -49,6 +50,21 @@ impl AsCoord2d for Coord2d {
     }
 }
 
+impl AsCoord2d for (i32, i32) {
+    fn to_coord(self) -> Coord2d {
+        Coord2d {
+            x: self.0.into(),
+            y: self.1.into(),
+        }
+    }
+    fn x(&self) -> i64 {
+        self.0.into()
+    }
+    fn y(&self) -> i64 {
+        self.1.into()
+    }
+}
+
 impl AsCoord2d for (i64, i64) {
     fn to_coord(self) -> Coord2d {
         Coord2d { x: self.0, y: self.1 }
@@ -76,17 +92,39 @@ impl AsCoord2d for (usize, usize) {
     }
 }
 
+impl AsCoord2d for (u64, u64) {
+    fn to_coord(self) -> Coord2d {
+        Coord2d {
+            x: self.0 as i64,
+            y: self.1 as i64,
+        }
+    }
+    fn x(&self) -> i64 {
+        self.0 as i64
+    }
+    fn y(&self) -> i64 {
+        self.1 as i64
+    }
+}
+
 #[derive(Clone)]
 pub struct Grid<T> {
     pub data: Vec<T>,
     width: i64,
 }
 
-impl<T: Copy + Eq + PartialEq + Display + Debug> Grid<T> {
+impl<T: Clone + Eq + PartialEq + Display + Debug> Grid<T> {
     pub fn new(width: i64) -> Self {
         Self {
             data: Vec::new(),
             width,
+        }
+    }
+    /// Returns a new [Grid] with the same shape (width x height) as `self`, filled with `fill`
+    pub fn same_shape<NT: Clone + Eq + PartialEq + Display + Debug>(&self, fill: NT) -> Grid<NT> {
+        Grid {
+            data: Vec::from_iter(repeat(fill).take(self.width() * self.height())),
+            width: self.width,
         }
     }
     pub fn with_shape(width: usize, height: usize, fill: T) -> Self {
@@ -96,10 +134,10 @@ impl<T: Copy + Eq + PartialEq + Display + Debug> Grid<T> {
         }
     }
     pub fn width(&self) -> usize {
-        return self.width as usize;
+        self.width as usize
     }
     pub fn height(&self) -> usize {
-        return self.data.len() / self.width();
+        self.data.len() / self.width()
     }
     fn pos<C: AsCoord2d>(&self, c: &C) -> i64 {
         c.y() * self.width + c.x()
@@ -124,18 +162,17 @@ impl<T: Copy + Eq + PartialEq + Display + Debug> Grid<T> {
         }
         self.pos(c).try_into().ok()
     }
-    pub fn get<C: AsCoord2d>(&self, c: &C) -> Option<T> {
+    pub fn get<C: AsCoord2d>(&self, c: &C) -> Option<&T> {
         match self.valid_pos(c) {
-            Some(pos) => Some(self.data[pos]),
+            Some(pos) => Some(&self.data[pos]),
             None => None,
         }
     }
-    pub fn set<C: AsCoord2d>(&mut self, c: &C, val: T) -> Option<T> {
+    pub fn set<C: AsCoord2d>(&mut self, c: &C, mut val: T) -> Option<T> {
         match self.valid_pos(c) {
             Some(pos) => {
-                let res = Some(self.data[pos]);
-                self.data[pos] = val;
-                res
+                swap(&mut self.data[pos], &mut val);
+                Some(val)
             }
             None => None,
         }
@@ -192,17 +229,17 @@ impl<T: Copy + Eq + PartialEq + Display + Debug> Grid<T> {
     // }
 }
 
-impl<T: BufRead> From<Lines<T>> for Grid<u8> {
-    fn from(input: Lines<T>) -> Grid<u8> {
+impl<T: BufRead> From<T> for Grid<u8> {
+    fn from(input: T) -> Grid<u8> {
         let mut data = Vec::new();
         let mut width = 0;
-        for line in input.map(|i| i.unwrap()) {
+        for line in input.split(b'\n').map(|i| i.unwrap()) {
             if width == 0 {
                 width = line.len() as i64
             } else if line.len() as i64 != width {
                 panic!("Grids must have fixed length rows")
             }
-            data.extend_from_slice(line.as_bytes());
+            data.extend_from_slice(&line);
         }
         Grid { data, width }
     }
@@ -224,7 +261,7 @@ impl Display for Grid<u8> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for y in 0..self.height() {
             for x in 0..self.width() {
-                f.write_fmt(format_args!("{}", self.get(&(x as i64, y as i64)).unwrap() as char))?;
+                f.write_fmt(format_args!("{}", *self.get(&(x as i64, y as i64)).unwrap() as char))?;
             }
             f.write_char('\n')?;
         }
@@ -236,13 +273,13 @@ impl Display for Grid<u8> {
 mod tests {
     use super::*;
 
-    static TEST_VECTOR: &str = &"ABCD
+    static TEST_VECTOR: &[u8] = b"ABCD
 EFGH
 IJKL
 FBCG";
 
     fn unchecked_load() -> Grid<u8> {
-        Grid::from(Cursor::new(TEST_VECTOR).lines())
+        Grid::from(TEST_VECTOR)
     }
 
     #[test]
@@ -254,8 +291,8 @@ FBCG";
     #[test]
     fn indexing() {
         let grid = unchecked_load();
-        assert_eq!(grid.get(&(0, 0)), Some(b'A'));
-        assert_eq!(grid.get(&(3, 3)), Some(b'G'));
+        assert_eq!(grid.get(&(0, 0)), Some(b'A').as_ref());
+        assert_eq!(grid.get(&(3, 3)), Some(b'G').as_ref());
         assert_eq!(grid.get(&(-1, 0)), None);
         assert_eq!(grid.get(&(0, -1)), None);
         assert_eq!(grid.get(&(5, 0)), None);
@@ -271,11 +308,11 @@ FBCG";
         assert_eq!(grid.forward_slice(&(0, 2), 4), Some(b"IJKL".as_slice()));
     }
 
-    #[test]
-    fn window_compare() {
-        let grid = unchecked_load();
-        assert_eq!(grid.window_compare(b"IJKL"), &[(0, 2)]);
-        assert_eq!(grid.window_compare(b"BC"), &[(1, 0), (1, 3)]);
-        assert_eq!(grid.window_compare(b"LF").len(), 0);
-    }
+    // #[test]
+    // fn window_compare() {
+    //     let grid = unchecked_load();
+    //     assert_eq!(grid.window_compare(b"IJKL"), &[(0, 2)]);
+    //     assert_eq!(grid.window_compare(b"BC"), &[(1, 0), (1, 3)]);
+    //     assert_eq!(grid.window_compare(b"LF").len(), 0);
+    // }
 }

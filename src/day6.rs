@@ -3,14 +3,14 @@ use bitflags::bitflags;
 use rayon::iter::ParallelIterator;
 use rayon::slice::ParallelSlice;
 use std::fmt;
-use std::io::{BufRead, Lines};
+use std::io::BufRead;
 use std::ops::BitAnd;
 
 use grid::Grid;
 
 #[aoc_generator(day6)]
 pub fn get_input(input: &[u8]) -> Map {
-    Map::from(input.lines())
+    Map::from(input)
 }
 
 #[repr(u8)]
@@ -96,8 +96,8 @@ pub struct Map {
     path: Vec<((i64, i64), FacingDirection)>,
 }
 
-impl<T: BufRead> From<Lines<T>> for Map {
-    fn from(input: Lines<T>) -> Self {
+impl<T: BufRead> From<T> for Map {
+    fn from(input: T) -> Self {
         let grid = Grid::from(input);
         let mut visited_from: Grid<DirectionSet> = Grid::new(grid.width() as i64);
         visited_from.data.resize(grid.data.len(), DirectionSet::empty());
@@ -114,7 +114,7 @@ impl<T: BufRead> From<Lines<T>> for Map {
 }
 
 impl Map {
-    fn look(&self, dir: &FacingDirection) -> Option<u8> {
+    fn look(&self, dir: &FacingDirection) -> Option<&u8> {
         self.grid.get(&dir.pos_ofs(self.guard_pos))
     }
     /// Move one step in the facing direction, return if we are still inside the bounds
@@ -132,7 +132,7 @@ impl Map {
             }
             self.visited_from.set(
                 &new_pos,
-                self.visited_from.get(&new_pos).unwrap() | self.guard_facing.into(),
+                *self.visited_from.get(&new_pos).unwrap() | self.guard_facing.into(),
             );
             self.guard_pos = new_pos;
             StepOutcome::Continue
