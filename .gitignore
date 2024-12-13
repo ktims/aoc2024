@@ -3,3 +3,5 @@ input
 flamegraph.svg
 perf.data*
 guesses
+.aoc_tiles/*
+!.aoc_tiles/tiles/
