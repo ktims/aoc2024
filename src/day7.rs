@@ -1,5 +1,4 @@
 use aoc_runner_derive::{aoc, aoc_generator};
-use itertools::Itertools;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::io::{BufRead, Lines};
 
@@ -27,7 +26,6 @@ impl From<&str> for Calibration {
 #[derive(Debug)]
 pub struct Calibrations {
     cals: Vec<Calibration>,
-    longest_cal: usize,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -49,64 +47,51 @@ impl Operator {
 
 impl<T: BufRead> From<Lines<T>> for Calibrations {
     fn from(input: Lines<T>) -> Self {
-        let mut cals = Vec::new();
-        let mut longest_cal = 0;
-        for line in input.map(|l| l.unwrap()) {
-            let cal: Calibration = line.as_str().into();
-            longest_cal = std::cmp::max(longest_cal, cal.numbers.len());
-            cals.push(cal);
-        }
-        Self { cals, longest_cal }
+        let cals = input.map(|l| l.unwrap().as_str().into()).collect();
+        Self { cals }
     }
 }
 
 impl Calibrations {
-    fn make_operator_sets(operators: &[Operator], n_opers: usize) -> Vec<Vec<Vec<Operator>>> {
-        (0..n_opers)
-            .map(|k| {
-                std::iter::repeat_n(operators.iter().copied(), k)
-                    .multi_cartesian_product()
-                    .collect()
-            })
-            .collect()
-    }
-    fn check_oper_set(cal: &Calibration, oper_set: &[Operator]) -> bool {
-        let accum = oper_set
-            .iter()
-            .zip(cal.numbers.iter().skip(1))
-            .fold(cal.numbers[0], |accum, (oper, val)| oper.exec(accum, *val));
-        accum == cal.result
-    }
     fn possible(&self, operators: &[Operator]) -> u64 {
-        let operator_sets = Calibrations::make_operator_sets(operators, self.longest_cal);
         self.cals
             .par_iter()
-            .map(|cal| {
-                let n_opers = cal.numbers.len() - 1;
-                if operator_sets[n_opers]
-                    .par_iter()
-                    .find_any(|oper_set| Self::check_oper_set(cal, oper_set))
-                    .is_some()
-                {
-                    return cal.result;
-                }
-                0
-            })
+            .map(|cal| eval_calibration(operators, cal.result, cal.numbers[0], &cal.numbers[1..]))
+            .map(|result| result.unwrap_or(0))
             .sum()
     }
+}
+
+fn eval_calibration(operators: &[Operator], expect: u64, left: u64, right: &[u64]) -> Option<u64> {
+    if left > expect {
+        // all operations make the number larger, so this branch is hopeless, early exit
+        return None;
+    }
+    if right.is_empty() {
+        // base case - no further operations
+        if left == expect {
+            return Some(left);
+        } else {
+            return None;
+        }
+    }
+    operators
+        .iter()
+        .map(|oper| eval_calibration(operators, expect, oper.exec(left, right[0]), &right[1..]))
+        .find_map(|result| result)
 }
 
 // PROBLEM 1 solution
 #[aoc(day7, part1)]
 pub fn part1(cals: &Calibrations) -> u64 {
-    let operators = [Operator::Add, Operator::Multiply];
+    let operators = [Operator::Multiply, Operator::Add];
     cals.possible(&operators)
 }
 
 // PROBLEM 2 solution
 #[aoc(day7, part2)]
 pub fn part2(cals: &Calibrations) -> u64 {
-    let operators = [Operator::Add, Operator::Multiply, Operator::Concatenate];
+    let operators = [Operator::Multiply, Operator::Add, Operator::Concatenate];
     cals.possible(&operators)
 }
 
