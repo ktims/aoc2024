@@ -41,40 +41,4 @@
 <a href="src/day13.rs">
   <img src=".aoc_tiles/tiles/2024/13.png" width="161px">
 </a>
-<a href="None">
-  <img src=".aoc_tiles/tiles/2024/14.png" width="161px">
-</a>
-<a href="None">
-  <img src=".aoc_tiles/tiles/2024/15.png" width="161px">
-</a>
-<a href="None">
-  <img src=".aoc_tiles/tiles/2024/16.png" width="161px">
-</a>
-<a href="None">
-  <img src=".aoc_tiles/tiles/2024/17.png" width="161px">
-</a>
-<a href="None">
-  <img src=".aoc_tiles/tiles/2024/18.png" width="161px">
-</a>
-<a href="None">
-  <img src=".aoc_tiles/tiles/2024/19.png" width="161px">
-</a>
-<a href="None">
-  <img src=".aoc_tiles/tiles/2024/20.png" width="161px">
-</a>
-<a href="None">
-  <img src=".aoc_tiles/tiles/2024/21.png" width="161px">
-</a>
-<a href="None">
-  <img src=".aoc_tiles/tiles/2024/22.png" width="161px">
-</a>
-<a href="None">
-  <img src=".aoc_tiles/tiles/2024/23.png" width="161px">
-</a>
-<a href="None">
-  <img src=".aoc_tiles/tiles/2024/24.png" width="161px">
-</a>
-<a href="None">
-  <img src=".aoc_tiles/tiles/2024/25.png" width="161px">
-</a>
 <!-- AOC TILES END -->
