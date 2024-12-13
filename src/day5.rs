@@ -65,10 +65,7 @@ impl OrderingRules {
         }
     }
     fn is_sorted(&self, a: u64, b: u64) -> bool {
-        match self.pairs.get(&(a, b)) {
-            Some(Ordering::Less) | Some(Ordering::Equal) => true,
-            _ => false,
-        }
+        matches!(self.pairs.get(&(a, b)), Some(Ordering::Less) | Some(Ordering::Equal))
     }
 }
 

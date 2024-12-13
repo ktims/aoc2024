@@ -10,7 +10,7 @@ pub fn get_input(input: &[u8]) -> Vec<String> {
 
 // PROBLEM 1 solution
 #[aoc(day3, part1)]
-pub fn part1(input: &Vec<String>) -> u64 {
+pub fn part1(input: &[String]) -> u64 {
     let re = Regex::new(r"(?-u)mul\((\d+),(\d+)\)").unwrap();
     input
         .iter()
@@ -24,7 +24,7 @@ pub fn part1(input: &Vec<String>) -> u64 {
 
 // PROBLEM 2 solution
 #[aoc(day3, part2)]
-pub fn part2(input: &Vec<String>) -> u64 {
+pub fn part2(input: &[String]) -> u64 {
     let mut sum = 0u64;
     let mut do_mul: u64 = 1;
     let re = Regex::new(r"(?-u)(do\(\)|don't\(\)|mul\((\d+),(\d+)\))").unwrap();
