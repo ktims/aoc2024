@@ -12,5 +12,6 @@ repos:
             args:
             - --auto-add-tiles-to-git=amend
             - --create-all-days
+            - --overwrite-year=2024
             #     - --language-sorting=jl,kt,py,rs
             #     - --exclude-patterns=2021/*/*.apl,2021/*/*.py,2021/*/*.cpp
