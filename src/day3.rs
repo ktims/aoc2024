@@ -1,4 +1,5 @@
 use aoc_runner_derive::{aoc, aoc_generator};
+use atoi::FromRadix10;
 use regex::bytes::Regex;
 use std::io::BufRead;
 
@@ -15,8 +16,7 @@ pub fn part1(input: &Vec<String>) -> u64 {
     for line in input {
         let line = line.as_bytes();
         for m in re.captures_iter(line) {
-            sum += std::str::from_utf8(&m[1]).unwrap().parse::<u64>().unwrap()
-                * std::str::from_utf8(&m[2]).unwrap().parse::<u64>().unwrap();
+            sum += u64::from_radix_10(&m[1]).0 * u64::from_radix_10(&m[2]).0;
         }
     }
     sum
@@ -31,12 +31,11 @@ pub fn part2(input: &Vec<String>) -> u64 {
     for line in input {
         let line = line.as_bytes();
         for m in re.captures_iter(line) {
-            match std::str::from_utf8(&m[1]).unwrap() {
-                "do()" => do_mul = true,
-                "don't()" => do_mul = false,
+            match &m[1] {
+                b"do()" => do_mul = true,
+                b"don't()" => do_mul = false,
                 _ if do_mul => {
-                    sum += std::str::from_utf8(&m[2]).unwrap().parse::<u64>().unwrap()
-                        * std::str::from_utf8(&m[3]).unwrap().parse::<u64>().unwrap()
+                    sum += u64::from_radix_10(&m[2]).0 * u64::from_radix_10(&m[3]).0;
                 }
                 _ => {}
             }
