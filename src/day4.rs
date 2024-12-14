@@ -53,11 +53,17 @@ impl WordSearch {
         for x in 0..width {
             for y in 0..height {
                 // check down-right
-                if x <= width - needle.len() && y <= height - needle.len() && (0..needle.len()).all(|i| self.get(x + i, y + i) == needle.as_bytes()[i].into()) {
+                if x <= width - needle.len()
+                    && y <= height - needle.len()
+                    && (0..needle.len()).all(|i| self.get(x + i, y + i) == needle.as_bytes()[i].into())
+                {
                     count += 1
                 }
                 // check down-left
-                if x >= needle.len() - 1 && y <= height - needle.len() && (0..needle.len()).all(|i| self.get(x - i, y + i) == needle.as_bytes()[i].into()) {
+                if x >= needle.len() - 1
+                    && y <= height - needle.len()
+                    && (0..needle.len()).all(|i| self.get(x - i, y + i) == needle.as_bytes()[i].into())
+                {
                     count += 1
                 }
             }
