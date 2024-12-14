@@ -1,4 +1,5 @@
 use aoc_runner_derive::aoc;
+use colored::Colorize;
 use grid::{AsCoord2d, Coord2d, Grid};
 use regex::Regex;
 use std::str::FromStr;
@@ -77,13 +78,13 @@ fn display(robots: &Vec<Robot>, bounds: (i64, i64)) {
             print!(
                 "{}",
                 if *grid.get(&(col, row)).unwrap() != 0 {
-                    "█"
+                    "█".green()
                 } else {
-                    " "
+                    " ".color(colored::Color::Black)
                 }
             );
         }
-        println!(" EOL");
+        println!();
     }
 }
 
@@ -136,6 +137,7 @@ pub fn part2(input: &str) -> u64 {
             .filter(|c| !c.is_empty() && c[0] != 0)
             .any(|c| c.len() > width as usize / 10)
         {
+            display(&robots, (width, height));
             return i;
         }
     }
