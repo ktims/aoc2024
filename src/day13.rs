@@ -20,9 +20,9 @@ impl ClawMachine {
         let prize_re = Regex::new(r"X=(\d+), Y=(\d+)").unwrap();
         // consume 3 lines - a, b, prize
         if let Some((a_line, b_line, prize_line)) = input.filter(|l| !l.is_empty()).take(3).collect_tuple() {
-            let a_caps = ofs_re.captures(&a_line).unwrap();
-            let b_caps = ofs_re.captures(&b_line).unwrap();
-            let prize_caps = prize_re.captures(&prize_line).unwrap();
+            let a_caps = ofs_re.captures(a_line).unwrap();
+            let b_caps = ofs_re.captures(b_line).unwrap();
+            let prize_caps = prize_re.captures(prize_line).unwrap();
             let button_a = MachineAction(
                 a_caps.get(1).unwrap().as_str().parse().unwrap(),
                 a_caps.get(2).unwrap().as_str().parse().unwrap(),
