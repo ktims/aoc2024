@@ -89,7 +89,7 @@ pub fn part2(input: &str) -> IntType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    pub const EXAMPLE: &str = &"125 17";
+    pub const EXAMPLE: &str = "125 17";
 
     #[test]
     fn part1_example() {
