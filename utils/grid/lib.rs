@@ -1,9 +1,10 @@
 use std::{
     fmt::{Debug, Display, Formatter, Write},
-    io::BufRead,
+    io::{BufRead, Cursor},
     iter::repeat,
     mem::swap,
     ops::{Add, Sub},
+    str::FromStr,
 };
 
 #[derive(Clone, Debug)]
@@ -107,7 +108,7 @@ impl AsCoord2d for (u64, u64) {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Grid<T> {
     pub data: Vec<T>,
     width: i64,
@@ -245,6 +246,14 @@ impl<T: BufRead> From<T> for Grid<u8> {
     }
 }
 
+// Should be Grid<char>?
+impl FromStr for Grid<u8> {
+    type Err = Box<dyn std::error::Error>;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Cursor::new(s).into())
+    }
+}
+
 // impl<T: Copy + Eq + PartialEq + Display + Debug + Into<char>> Display for Grid<T> {
 //     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 //         for y in 0..self.height() {
@@ -278,6 +287,11 @@ EFGH
 IJKL
 FBCG";
 
+    static TEST_VECTOR_S: &str = "ABCD
+EFGH
+IJKL
+FBCG";
+
     fn unchecked_load() -> Grid<u8> {
         Grid::from(TEST_VECTOR)
     }
@@ -286,6 +300,7 @@ FBCG";
     fn from_string() {
         let grid = unchecked_load();
         assert_eq!(grid.data, "ABCDEFGHIJKLFBCG".as_bytes());
+        assert_eq!(TEST_VECTOR_S.parse::<Grid<u8>>().unwrap().data, "ABCDEFGHIJKLFBCG".as_bytes());
     }
 
     #[test]
