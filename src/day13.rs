@@ -1,8 +1,7 @@
-use std::io::{BufRead, Lines};
-
-use aoc_runner_derive::{aoc, aoc_generator};
+use aoc_runner_derive::aoc;
 use itertools::Itertools;
 use regex::Regex;
+use std::str::Lines;
 
 #[derive(Debug, Clone)]
 pub struct MachineAction(i64, i64);
@@ -15,17 +14,12 @@ struct ClawMachine {
 }
 
 impl ClawMachine {
-    fn consume_from_input<T: BufRead>(input: &mut Lines<T>) -> Option<Self> {
+    fn consume_from_input(input: &mut Lines) -> Option<Self> {
         // consume any empty lines at the front
         let ofs_re = Regex::new(r"X([+-]\d+), Y([+-]\d+)").unwrap();
         let prize_re = Regex::new(r"X=(\d+), Y=(\d+)").unwrap();
         // consume 3 lines - a, b, prize
-        if let Some((a_line, b_line, prize_line)) = input
-            .filter(|l| l.as_ref().is_ok_and(|l| !l.is_empty()))
-            .take(3)
-            .map(|l| l.unwrap())
-            .collect_tuple()
-        {
+        if let Some((a_line, b_line, prize_line)) = input.filter(|l| !l.is_empty()).take(3).collect_tuple() {
             let a_caps = ofs_re.captures(&a_line).unwrap();
             let b_caps = ofs_re.captures(&b_line).unwrap();
             let prize_caps = prize_re.captures(&prize_line).unwrap();
@@ -76,8 +70,8 @@ struct ClawMachines {
     machines: Vec<ClawMachine>,
 }
 
-impl From<&[u8]> for ClawMachines {
-    fn from(input: &[u8]) -> Self {
+impl From<&str> for ClawMachines {
+    fn from(input: &str) -> Self {
         let mut machines = Vec::new();
         let mut lines = input.lines();
         while let Some(machine) = ClawMachine::consume_from_input(&mut lines) {
@@ -87,19 +81,19 @@ impl From<&[u8]> for ClawMachines {
     }
 }
 
-#[aoc_generator(day13)]
-fn parse(input: &[u8]) -> ClawMachines {
+fn parse(input: &str) -> ClawMachines {
     ClawMachines::from(input)
 }
 
 #[aoc(day13, part1)]
-fn part1(machines: &ClawMachines) -> i64 {
+fn part1(input: &str) -> i64 {
+    let machines = parse(input);
     machines.machines.iter().filter_map(|m| m.cheapest_prize()).sum()
 }
 
 #[aoc(day13, part2)]
-fn part2(machines: &ClawMachines) -> i64 {
-    let mut machines = machines.clone();
+fn part2(input: &str) -> i64 {
+    let mut machines = parse(input);
     machines
         .machines
         .iter_mut()
@@ -113,7 +107,7 @@ fn part2(machines: &ClawMachines) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    const EXAMPLE: &[u8] = b"Button A: X+94, Y+34
+    const EXAMPLE: &str = "Button A: X+94, Y+34
 Button B: X+22, Y+67
 Prize: X=8400, Y=5400
 
@@ -131,11 +125,11 @@ Prize: X=18641, Y=10279";
 
     #[test]
     fn part1_example() {
-        assert_eq!(part1(&parse(EXAMPLE)), 480);
+        assert_eq!(part1(EXAMPLE), 480);
     }
 
     #[test]
     fn part2_example() {
-        assert_eq!(part2(&parse(EXAMPLE)), 875318608908);
+        assert_eq!(part2(EXAMPLE), 875318608908);
     }
 }

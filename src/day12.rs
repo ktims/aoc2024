@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use aoc_runner_derive::{aoc, aoc_generator};
 use grid::{Coord2d, Grid};
 
@@ -5,11 +7,10 @@ pub struct Farm {
     map: Grid<u8>,
 }
 
-impl From<&[u8]> for Farm {
-    fn from(input: &[u8]) -> Self {
-        Self {
-            map: Grid::from(input),
-        }
+impl FromStr for Farm {
+    type Err = <Grid<u8> as FromStr>::Err;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        Ok(Self { map: input.parse()? })
     }
 }
 
@@ -100,10 +101,12 @@ impl Farm {
                         if visited.get(adj) == Some(&false) {
                             // add the perimeter of the growth from there if not visited yet
                             let (n_area, n_corners) = self.region_corners(adj, visited);
-                            (area+n_area, corners+n_corners)
-                        } else { (area, corners) }
+                            (area + n_area, corners + n_corners)
+                        } else {
+                            (area, corners)
+                        }
                     }
-                    Some(_) | None => { (area, corners) }
+                    Some(_) | None => (area, corners),
                 }
             })
     }
@@ -131,25 +134,26 @@ impl Farm {
     }
 }
 
-#[aoc_generator(day12)]
-fn parse(input: &[u8]) -> Farm {
-    input.into()
+fn parse(input: &str) -> Farm {
+    input.parse().unwrap()
 }
 
 #[aoc(day12, part1)]
-pub fn part1(farm: &Farm) -> u64 {
+pub fn part1(input: &str) -> u64 {
+    let farm = parse(input);
     farm.regions_cost()
 }
 
 #[aoc(day12, part2)]
-pub fn part2(farm: &Farm) -> u64 {
+pub fn part2(input: &str) -> u64 {
+    let farm = parse(input);
     farm.regions_discount_cost()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    const EXAMPLE: &[u8] = b"RRRRIICCFF
+    const EXAMPLE: &str = "RRRRIICCFF
 RRRRIICCCF
 VVRRRCCFFF
 VVRCCCJFFF
@@ -162,11 +166,11 @@ MMMISSJEEE";
 
     #[test]
     fn part1_example() {
-        assert_eq!(part1(&parse(EXAMPLE)), 1930);
+        assert_eq!(part1(EXAMPLE), 1930);
     }
 
     #[test]
     fn part2_example() {
-        assert_eq!(part2(&parse(EXAMPLE)), 1206);
+        assert_eq!(part2(EXAMPLE), 1206);
     }
 }
