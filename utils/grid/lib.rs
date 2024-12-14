@@ -3,7 +3,7 @@ use std::{
     io::{BufRead, Cursor},
     iter::repeat,
     mem::swap,
-    ops::{Add, Sub},
+    ops::{Add, AddAssign, Sub},
     str::FromStr,
 };
 
@@ -42,6 +42,18 @@ impl<T: AsCoord2d> Add<T> for &Coord2d {
 impl AsCoord2d for Coord2d {
     fn to_coord(self) -> Coord2d {
         self
+    }
+    fn x(&self) -> i64 {
+        self.x
+    }
+    fn y(&self) -> i64 {
+        self.y
+    }
+}
+
+impl AsCoord2d for &Coord2d {
+    fn to_coord(self) -> Coord2d {
+        self.to_owned()
     }
     fn x(&self) -> i64 {
         self.x
@@ -178,6 +190,18 @@ impl<T: Clone + Eq + PartialEq + Display + Debug> Grid<T> {
             None => None,
         }
     }
+    pub fn increment<'a, A, C: AsCoord2d>(&'a mut self, c: &C, i: A) -> Option<&'a T>
+    where
+        T: AddAssign<A>,
+    {
+        match self.valid_pos(c) {
+            Some(pos) => {
+                self.data[pos] += i;
+                Some(&self.data[pos])
+            }
+            None => None,
+        }
+    }
     pub fn row(&self, y: i64) -> Option<&[T]> {
         if y < self.height() as i64 {
             Some(&self.data[self.pos(&(0, y)) as usize..self.pos(&(self.width, y)) as usize])
@@ -300,7 +324,10 @@ FBCG";
     fn from_string() {
         let grid = unchecked_load();
         assert_eq!(grid.data, "ABCDEFGHIJKLFBCG".as_bytes());
-        assert_eq!(TEST_VECTOR_S.parse::<Grid<u8>>().unwrap().data, "ABCDEFGHIJKLFBCG".as_bytes());
+        assert_eq!(
+            TEST_VECTOR_S.parse::<Grid<u8>>().unwrap().data,
+            "ABCDEFGHIJKLFBCG".as_bytes()
+        );
     }
 
     #[test]
