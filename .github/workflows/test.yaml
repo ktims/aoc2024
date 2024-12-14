@@ -20,6 +20,11 @@ jobs:
         components: clippy, rustfmt
         toolchain: stable
 
+    - name: fake inputs
+      run: |
+        mkdir -p input/2024/
+        for i in $(seq 1 25); do touch input/2024/day${i}.txt; done
+
     - name: cargo test
       run: cargo test --lib --all-features
 
