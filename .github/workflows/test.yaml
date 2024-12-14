@@ -20,10 +20,31 @@ jobs:
         components: clippy, rustfmt
         toolchain: stable
 
-    - name: fake inputs
+    - name: install cargo-aoc
+      run: cargo install --locked cargo-aoc
+
+    - name: get date
+      id: date
       run: |
-        mkdir -p input/2024/
-        for i in $(seq 1 25); do touch input/2024/day${i}.txt; done
+        echo date=$(date +%Y%m%d) > $GITHUB_OUTPUT
+
+    - name: Get cached inputs
+      id: inputs
+      uses: actions/cache@v4
+      with:
+        path: input
+        key: ${{ steps.date.outputs.date }}
+
+    - name: Get inputs from source
+      if: steps.inputs.outputs.cache-hit != 'true'
+      run: |
+        cargo aoc credentials ${{ secrets.AOC_SESSION }}
+        for i in $(seq 1 25); do
+          dayfmt=$(printf %02d $i)
+          if [${{ steps.date.outputs.date }} -ge 202412${dayfmt}]; then
+            cargo aoc input --year 2024 --day $i
+          fi
+        done
 
     - name: cargo test
       run: cargo test --lib --all-features
@@ -31,5 +52,8 @@ jobs:
     - name: rustfmt
       run: cargo fmt --all -- --check
 
-    # - name: clippy
-    #   run: cargo clippy --lib --all-features --tests -- -D warnings
+    - name: clippy
+      run: cargo clippy --lib --all-features --tests -- -D warnings
+
+    - name: full run
+      run: cargo run --release
