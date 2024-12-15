@@ -152,7 +152,7 @@ impl<T: Clone + Eq + PartialEq + Display + Debug> Grid<T> {
     pub fn height(&self) -> usize {
         self.data.len() / self.width()
     }
-    fn pos<C: AsCoord2d>(&self, c: &C) -> i64 {
+    pub fn pos<C: AsCoord2d>(&self, c: &C) -> i64 {
         c.y() * self.width + c.x()
     }
     pub fn coord(&self, pos: i64) -> Option<(i64, i64)> {
@@ -203,8 +203,16 @@ impl<T: Clone + Eq + PartialEq + Display + Debug> Grid<T> {
         }
     }
     pub fn row(&self, y: i64) -> Option<&[T]> {
-        if y < self.height() as i64 {
+        if y < self.height() as i64 && y >= 0 {
             Some(&self.data[self.pos(&(0, y)) as usize..self.pos(&(self.width, y)) as usize])
+        } else {
+            None
+        }
+    }
+
+    pub fn col(&self, x: i64) -> Option<Vec<&T>> {
+        if x < self.width() as i64 && x >= 0 {
+            Some((0..self.height()).map(|y| self.get(&(x, y as i64)).unwrap()).collect())
         } else {
             None
         }
@@ -228,6 +236,13 @@ impl<T: Clone + Eq + PartialEq + Display + Debug> Grid<T> {
         match pos {
             (Some(pos1), Some(pos2)) => Some(&self.data[pos1..pos2 + 1]),
             _ => None,
+        }
+    }
+
+    pub fn swap<A: AsCoord2d, B: AsCoord2d>(&mut self, a: A, b: B) {
+        match (self.valid_pos(&a), self.valid_pos(&b)) {
+            (Some(a), Some(b)) => self.data.swap(a, b),
+            _ => {}
         }
     }
 
