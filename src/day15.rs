@@ -1,4 +1,5 @@
 use std::{
+    cmp,
     fmt::Display,
     io::{BufRead, Cursor, Lines},
     iter,
@@ -132,6 +133,59 @@ impl Warehouse {
         }
     }
 
+    fn step_robot_2(&mut self, dir: Move) {
+        let start = self.robot_pos.clone();
+        if self.push(&start, &dir) {
+            self.robot_pos = match dir {
+                Move::Left => (self.robot_pos.x() - 1, self.robot_pos.y()).to_coord(),
+                Move::Right => (self.robot_pos.x() + 1, self.robot_pos.y()).to_coord(),
+                Move::Up => (self.robot_pos.x(), self.robot_pos.y() - 1).to_coord(),
+                Move::Down => (self.robot_pos.x(), self.robot_pos.y() + 1).to_coord(),
+            }
+        }
+    }
+
+    fn push(&mut self, pos: &Coord2d, dir: &Move) -> bool {
+        if self.can_push(pos, dir) {
+            let target = pos + dir.ofs();
+            match self.map.get(&target).unwrap() {
+                b'#' => {}
+                b'.' => self.map.swap(target, pos),
+                b'[' | b']' if *dir == Move::Left || *dir == Move::Right => {
+                    self.push(&target, dir);
+                    self.map.swap(target, pos)
+                }
+                b']' => {
+                    // move both parts
+                    self.push(&target, dir);
+                    self.push(&(&target + (-1, 0)), dir);
+                    self.map.swap(&target, pos);
+                }
+                b'[' => {
+                    self.push(&target, dir);
+                    self.push(&(&target + (1, 0)), dir);
+                    self.map.swap(&target, pos);
+                }
+                c => panic!("unexpected char {}", c),
+            }
+            return true;
+        }
+        false
+    }
+
+    fn can_push(&mut self, pos: &Coord2d, dir: &Move) -> bool {
+        let target = pos + dir.ofs();
+        return match self.map.get(&target).unwrap() {
+            b'#' => false,
+            b'.' => true,
+            b'O' => self.can_push(&target, dir),
+            b'[' | b']' if *dir == Move::Left || *dir == Move::Right => self.can_push(&target, dir),
+            b']' => self.can_push(&target, dir) && self.can_push(&(&target + (-1, 0)), dir),
+            b'[' => self.can_push(&target, dir) && self.can_push(&(&target + (1, 0)), dir),
+            c => panic!("unexpected char {}", c),
+        };
+    }
+
     fn embiggen(&mut self) {
         let new_lines = (0..self.map.height())
             .map(|r| self.map.row(r as i64).unwrap())
@@ -152,7 +206,7 @@ impl Warehouse {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 enum Move {
     Left,
     Right,
@@ -179,6 +233,17 @@ impl From<char> for Move {
             '^' => Self::Up,
             'v' => Self::Down,
             c => panic!("invalid move {}", c),
+        }
+    }
+}
+
+impl Move {
+    fn ofs(&self) -> (i64, i64) {
+        match self {
+            Move::Left => (-1, 0),
+            Move::Right => (1, 0),
+            Move::Up => (0, -1),
+            Move::Down => (0, 1),
         }
     }
 }
@@ -231,16 +296,21 @@ pub fn part2(input: &str) -> i64 {
     let (mut wh, moves) = parse(input);
     wh.embiggen();
 
-    let moves: MovePlan = ">>>>>>>>>>>>".parse().unwrap();
-
     println!("{}", wh);
     for m in moves.0 {
-        println!("{}", m);
-        wh.step_robot(m);
-        println!("{}", wh);
+        // println!("{}", m);
+        wh.step_robot_2(m);
+        // println!("{}", wh);
     }
-
-    0
+    println!("{}", wh);
+    let mut sum = 0;
+    wh.map
+        .data
+        .iter()
+        .enumerate()
+        .filter(|(i, v)| **v == b'[')
+        .map(|(i, _)| wh.map.coord(i as i64).unwrap().y() * 100 + wh.map.coord(i as i64).unwrap().x())
+        .sum()
 }
 
 #[cfg(test)]
@@ -278,6 +348,16 @@ vvv<<^>^v^^><<>>><>^<<><^vv^^<>vvv<>><^^v>^>vv<>v<<<<v<^v>^<^^>>>^<v<v
 ^^>vv<^v^v<vv>^<><v<^v>^^^>>>^^vvv^>vvv<>>>^<^>>>>>^<<^v>^vvv<>^<><<v>
 v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^";
 
+    const EXAMPLE3: &str = "#######
+#...#.#
+#.....#
+#..OO@#
+#..O..#
+#.....#
+#######
+
+<vv<<^^<<^^";
+
     #[test]
     fn part1_example() {
         assert_eq!(part1(EXAMPLE1), 2028);
@@ -286,7 +366,7 @@ v^^>>><<^^<>>^v^<v^vv<>v^<<>^<^v^v><^<<<><<^<v><v<>vv>>v><v^<vv<>v^<<^";
 
     #[test]
     fn part2_example() {
-        // assert_eq!(part2(EXAMPLE1), 0);
+        assert_eq!(part2(EXAMPLE3), 618);
         assert_eq!(part2(EXAMPLE2), 9021);
     }
 }
