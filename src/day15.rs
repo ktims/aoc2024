@@ -1,14 +1,7 @@
-use std::{
-    cmp,
-    fmt::Display,
-    io::{BufRead, Cursor, Lines},
-    iter,
-    str::FromStr,
-};
-
 use aoc_runner_derive::aoc;
 use grid::{AsCoord2d, Coord2d, Grid};
-use itertools::{rev, Itertools};
+use itertools::Itertools;
+use std::{fmt::Display, io::Cursor, str::FromStr};
 
 struct Warehouse {
     map: Grid<u8>,
@@ -22,118 +15,7 @@ impl Display for Warehouse {
 }
 
 impl Warehouse {
-    fn step_robot(&mut self, m: Move) {
-        match m {
-            Move::Left => {
-                let to_left = &self.map.row(self.robot_pos.y()).unwrap()[0..self.robot_pos.x() as usize];
-                let left_chunks = to_left
-                    .chunk_by(|a, b| a == b || (*a == b'[' && *b == b']'))
-                    .collect_vec();
-                match left_chunks.last().unwrap().last().unwrap() {
-                    b'.' => {
-                        self.map
-                            .swap(&self.robot_pos, (self.robot_pos.x() - 1, self.robot_pos.y()));
-                        self.robot_pos.x -= 1
-                    }
-                    b'O' | b'[' | b']' => {
-                        if left_chunks[left_chunks.len() - 2].last().unwrap() == &b'.' {
-                            let y = self.robot_pos.y();
-                            // swap the whole chunk left
-                            for x_target in self.robot_pos.x() - left_chunks.last().unwrap().len() as i64
-                                ..=self.robot_pos.x() as i64
-                            {
-                                self.map.swap((x_target, y), (x_target - 1, y));
-                            }
-                            self.robot_pos.x -= 1;
-                        }
-                    }
-                    b'#' => {}
-                    c => panic!("unexpected char {}", c),
-                }
-            }
-            Move::Right => {
-                let to_right =
-                    &self.map.row(self.robot_pos.y()).unwrap()[self.robot_pos.x() as usize + 1..self.map.width()];
-                let right_chunks = to_right
-                    .chunk_by(|a, b| a == b || (*a == b'[' && *b == b']'))
-                    .collect_vec();
-                match right_chunks[0][0] {
-                    b'.' => {
-                        self.map
-                            .swap(&self.robot_pos, (self.robot_pos.x() + 1, self.robot_pos.y()));
-                        self.robot_pos.x += 1
-                    }
-                    b'O' | b'[' | b']' => {
-                        if right_chunks[1][0] == b'.' {
-                            let y = self.robot_pos.y();
-                            // swap the whole chunk right
-                            for x_target in
-                                (self.robot_pos.x() + 1..=self.robot_pos.x() + 1 + right_chunks[0].len() as i64).rev()
-                            {
-                                self.map.swap((x_target, y), (x_target - 1, y));
-                            }
-                            self.robot_pos.x += 1;
-                        }
-                    }
-                    b'#' => {}
-                    c => panic!("unexpected char {}", c),
-                }
-            }
-            Move::Up => {
-                let to_up = &self.map.col(self.robot_pos.x()).unwrap()[0..self.robot_pos.y() as usize];
-                let up_chunks = to_up.chunk_by(|a, b| a == b).collect_vec();
-                match up_chunks.last().unwrap().last().unwrap() {
-                    b'.' => {
-                        self.map
-                            .swap(&self.robot_pos, (self.robot_pos.x(), self.robot_pos.y() - 1));
-                        self.robot_pos.y -= 1
-                    }
-                    b'O' => {
-                        if **up_chunks[up_chunks.len() - 2].last().unwrap() == b'.' {
-                            let x = self.robot_pos.x();
-                            // swap the whole chunk left
-                            for y_target in
-                                self.robot_pos.y() - up_chunks.last().unwrap().len() as i64..=self.robot_pos.y() as i64
-                            {
-                                self.map.swap((x, y_target), (x, y_target - 1));
-                            }
-                            self.robot_pos.y -= 1;
-                        }
-                    }
-                    b'#' => {}
-                    c => panic!("unexpected char {}", c),
-                }
-            }
-            Move::Down => {
-                let to_down =
-                    &self.map.col(self.robot_pos.x()).unwrap()[self.robot_pos.y() as usize + 1..self.map.height()];
-                let down_chunks = to_down.chunk_by(|a, b| a == b).collect_vec();
-                match down_chunks[0][0] {
-                    b'.' => {
-                        self.map
-                            .swap(&self.robot_pos, (self.robot_pos.x(), self.robot_pos.y() + 1));
-                        self.robot_pos.y += 1;
-                    }
-                    b'O' => {
-                        if *down_chunks[1][0] == b'.' {
-                            let x = self.robot_pos.x();
-                            // swap the whole chunk down
-                            for y_target in
-                                (self.robot_pos.y() + 1..=self.robot_pos.y() + 1 + down_chunks[0].len() as i64).rev()
-                            {
-                                self.map.swap((x, y_target), (x, y_target - 1));
-                            }
-                            self.robot_pos.y += 1;
-                        }
-                    }
-                    b'#' => {}
-                    c => panic!("unexpected char {}", c),
-                }
-            }
-        }
-    }
-
-    fn step_robot_2(&mut self, dir: Move) {
+    fn step_robot(&mut self, dir: Move) {
         let start = self.robot_pos.clone();
         if self.push(&start, &dir) {
             self.robot_pos = match dir {
@@ -151,6 +33,10 @@ impl Warehouse {
             match self.map.get(&target).unwrap() {
                 b'#' => {}
                 b'.' => self.map.swap(target, pos),
+                b'O' => {
+                    self.push(&target, dir);
+                    self.map.swap(target, pos);
+                }
                 b'[' | b']' if *dir == Move::Left || *dir == Move::Right => {
                     self.push(&target, dir);
                     self.map.swap(target, pos)
@@ -204,6 +90,16 @@ impl Warehouse {
         self.map = Grid::from(Cursor::new(new_lines.as_str()));
         self.robot_pos = self.map.find(&b'@').unwrap().to_coord();
     }
+
+    fn score(&self) -> i64 {
+        self.map
+            .data
+            .iter()
+            .enumerate()
+            .filter(|(_, v)| **v == b'O' || **v == b'[')
+            .map(|(i, _)| self.map.coord(i as i64).unwrap().y() * 100 + self.map.coord(i as i64).unwrap().x())
+            .sum()
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -254,9 +150,7 @@ struct MovePlan(Vec<Move>);
 impl FromStr for MovePlan {
     type Err = Box<dyn std::error::Error>;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(MovePlan(
-            s.chars().filter(|c| *c != '\n').map(|c| Move::from(c)).collect(),
-        ))
+        Ok(MovePlan(s.chars().filter(|c| *c != '\n').map(Move::from).collect()))
     }
 }
 
@@ -276,19 +170,10 @@ fn parse(input: &str) -> (Warehouse, MovePlan) {
 #[aoc(day15, part1)]
 pub fn part1(input: &str) -> i64 {
     let (mut wh, moves) = parse(input);
-    // println!("map:\n {}\nmoves: {:?}", wh, moves);
     for m in moves.0 {
-        // println!("{}", m);
         wh.step_robot(m);
-        // println!("{}", wh);
     }
-    wh.map
-        .data
-        .iter()
-        .enumerate()
-        .filter(|(i, v)| **v == b'O')
-        .map(|(i, _)| wh.map.coord(i as i64).unwrap().y() * 100 + wh.map.coord(i as i64).unwrap().x())
-        .sum()
+    wh.score()
 }
 
 #[aoc(day15, part2)]
@@ -296,21 +181,10 @@ pub fn part2(input: &str) -> i64 {
     let (mut wh, moves) = parse(input);
     wh.embiggen();
 
-    println!("{}", wh);
     for m in moves.0 {
-        // println!("{}", m);
-        wh.step_robot_2(m);
-        // println!("{}", wh);
+        wh.step_robot(m);
     }
-    println!("{}", wh);
-    let mut sum = 0;
-    wh.map
-        .data
-        .iter()
-        .enumerate()
-        .filter(|(i, v)| **v == b'[')
-        .map(|(i, _)| wh.map.coord(i as i64).unwrap().y() * 100 + wh.map.coord(i as i64).unwrap().x())
-        .sum()
+    wh.score()
 }
 
 #[cfg(test)]
