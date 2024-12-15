@@ -18,12 +18,7 @@ impl Warehouse {
     fn step_robot(&mut self, dir: Move) {
         let start = self.robot_pos.clone();
         if self.push(&start, &dir) {
-            self.robot_pos = match dir {
-                Move::Left => (self.robot_pos.x() - 1, self.robot_pos.y()).to_coord(),
-                Move::Right => (self.robot_pos.x() + 1, self.robot_pos.y()).to_coord(),
-                Move::Up => (self.robot_pos.x(), self.robot_pos.y() - 1).to_coord(),
-                Move::Down => (self.robot_pos.x(), self.robot_pos.y() + 1).to_coord(),
-            }
+            self.robot_pos = &self.robot_pos + dir.ofs();
         }
     }
 
@@ -61,7 +56,7 @@ impl Warehouse {
 
     fn can_push(&mut self, pos: &Coord2d, dir: &Move) -> bool {
         let target = pos + dir.ofs();
-        return match self.map.get(&target).unwrap() {
+        match self.map.get(&target).unwrap() {
             b'#' => false,
             b'.' => true,
             b'O' => self.can_push(&target, dir),
@@ -69,7 +64,7 @@ impl Warehouse {
             b']' => self.can_push(&target, dir) && self.can_push(&(&target + (-1, 0)), dir),
             b'[' => self.can_push(&target, dir) && self.can_push(&(&target + (1, 0)), dir),
             c => panic!("unexpected char {}", c),
-        };
+        }
     }
 
     fn embiggen(&mut self) {
