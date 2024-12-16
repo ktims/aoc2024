@@ -1,12 +1,26 @@
 use aoc_runner_derive::aoc;
 use colored::Colorize;
-use grid::{AsCoord2d, Coord2d, Grid};
-use regex::Regex;
-use std::str::FromStr;
+use grid::{AsCoord2d, Grid};
+use misc::CustomWrapped;
+use nom::{
+    bytes::complete::tag,
+    character::complete::digit1,
+    combinator::{map_res, opt, recognize},
+    sequence::{preceded, separated_pair},
+    IResult,
+};
+use std::{fmt::Display, str::FromStr};
 
+type Coord = (CustomWrapped<i64>, CustomWrapped<i64>);
 struct Robot {
-    pos: Coord2d,
-    vel: Coord2d,
+    pos: Coord,
+    vel: (i64, i64),
+}
+
+struct Robots {
+    robots: Vec<Robot>,
+    width: i64,
+    height: i64,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -17,52 +31,37 @@ enum Quadrant {
     SE = 3,
 }
 
-impl FromStr for Robot {
-    type Err = Box<dyn std::error::Error>;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let re = Regex::new(r"p=(\d+),(\d+) v=([+-]?\d+),([+-]?\d+)").unwrap();
-        match re.captures(s) {
-            Some(c) => Ok(Self {
-                pos: (
-                    c.get(1).unwrap().as_str().parse::<i64>().unwrap(),
-                    c.get(2).unwrap().as_str().parse().unwrap(),
-                )
-                    .to_coord(),
-                vel: (
-                    c.get(3).unwrap().as_str().parse::<i64>().unwrap(),
-                    c.get(4).unwrap().as_str().parse().unwrap(),
-                )
-                    .to_coord(),
-            }),
-            None => panic!(),
-        }
-    }
+fn nom_i64(input: &str) -> IResult<&str, i64> {
+    let (i, number) = map_res(recognize(preceded(opt(tag("-")), digit1)), |s| i64::from_str(s))(input)?;
+    Ok((i, number))
+}
+fn nom_i64_pair(input: &str) -> IResult<&str, (i64, i64)> {
+    let (i, pair) = separated_pair(nom_i64, tag(","), nom_i64)(input)?;
+    Ok((i, pair))
 }
 
 impl Robot {
-    fn step(&mut self, bounds: (i64, i64)) {
-        let mut candidate_new_pos = ((self.pos.x() + self.vel.x()), (self.pos.y() + self.vel.y()));
-        if candidate_new_pos.0 < 0 {
-            // if pos goes negative, add the upper bound
-            candidate_new_pos.0 += bounds.0;
+    fn from_str(s: &str, bounds: (i64, i64)) -> Self {
+        let (s, pos) = preceded(tag("p="), nom_i64_pair)(s).unwrap();
+        let (_, vel) = preceded(tag(" v="), nom_i64_pair)(s).unwrap();
+        Self {
+            pos: (CustomWrapped::new(pos.0, bounds.0), CustomWrapped::new(pos.1, bounds.1)),
+            vel,
         }
-        if candidate_new_pos.1 < 0 {
-            candidate_new_pos.1 += bounds.1;
-        }
-        candidate_new_pos.0 %= bounds.0;
-        candidate_new_pos.1 %= bounds.1;
-
-        self.pos = candidate_new_pos.to_coord();
+    }
+    fn step(&mut self, count: i64) {
+        self.pos.0 += self.vel.x() * count;
+        self.pos.1 += self.vel.y() * count;
     }
     fn quad(&self, bounds: (i64, i64)) -> Option<Quadrant> {
         let splits = (bounds.0 / 2, bounds.1 / 2);
-        if self.pos.x() < splits.0 && self.pos.y() < splits.1 {
+        if self.pos.0 < splits.0 && self.pos.1 < splits.1 {
             Some(Quadrant::NW)
-        } else if self.pos.x() > splits.0 && self.pos.y() < splits.1 {
+        } else if self.pos.0 > splits.0 && self.pos.1 < splits.1 {
             Some(Quadrant::NE)
-        } else if self.pos.x() < splits.0 && self.pos.y() > splits.1 {
+        } else if self.pos.0 < splits.0 && self.pos.1 > splits.1 {
             Some(Quadrant::SW)
-        } else if self.pos.x() > splits.0 && self.pos.y() > splits.1 {
+        } else if self.pos.0 > splits.0 && self.pos.1 > splits.1 {
             Some(Quadrant::SE)
         } else {
             None
@@ -70,49 +69,58 @@ impl Robot {
     }
 }
 
-#[allow(dead_code)]
-fn display(robots: &Vec<Robot>, bounds: (i64, i64)) {
-    let grid = as_grid(robots, bounds);
-    for row in 0..grid.height() {
-        for col in 0..grid.width() {
-            print!(
-                "{}",
-                if *grid.get(&(col, row)).unwrap() != 0 {
-                    "█".green()
-                } else {
-                    " ".color(colored::Color::Black)
-                }
-            );
+impl Robots {
+    fn from_vec(robots: Vec<Robot>, width: i64, height: i64) -> Self {
+        Self { robots, width, height }
+    }
+    fn as_grid(&self) -> Grid<usize> {
+        let mut grid = Grid::with_shape(self.width as usize, self.height as usize, 0usize);
+        for r in &self.robots {
+            grid.increment(&(r.pos.0.val, r.pos.1.val), 1usize);
         }
-        println!();
+        grid
+    }
+    fn count_quads(&self) -> [u64; 4] {
+        let mut counts = [0; 4];
+        for r in &self.robots {
+            if let Some(q) = r.quad((self.width, self.height)) {
+                counts[q as usize] += 1
+            }
+        }
+        counts
+    }
+    fn step(&mut self, count: i64) {
+        for robot in &mut self.robots {
+            robot.step(count)
+        }
     }
 }
 
-fn as_grid(robots: &Vec<Robot>, bounds: (i64, i64)) -> Grid<usize> {
-    let mut grid = Grid::with_shape(bounds.0 as usize, bounds.1 as usize, 0);
-    for r in robots {
-        grid.increment(&r.pos, 1usize);
+impl Display for Robots {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let grid = self.as_grid();
+        for row in 0..grid.height() {
+            for col in 0..grid.width() {
+                if *grid.get(&(col, row)).unwrap() != 0 {
+                    "█".green().fmt(f)?;
+                } else {
+                    " ".color(colored::Color::Black).fmt(f)?;
+                }
+            }
+            writeln!(f)?
+        }
+        Ok(())
     }
-    grid
 }
 
-fn parse(input: &str) -> Vec<Robot> {
-    input.lines().map(|l| l.parse().unwrap()).collect()
+fn parse(input: &str, width: i64, height: i64) -> Vec<Robot> {
+    input.lines().map(|l| Robot::from_str(l, (width, height))).collect()
 }
 
 fn part1_impl(input: &str, width: i64, height: i64) -> u64 {
-    let mut robots = parse(input);
-    for _ in 0..100 {
-        for r in &mut robots {
-            r.step((width, height))
-        }
-    }
-    let mut counts = [0; 4];
-    for r in robots {
-        if let Some(q) = r.quad((width, height)) {
-            counts[q as usize] += 1
-        }
-    }
+    let mut robots = Robots::from_vec(parse(input, width, height), width, height);
+    robots.step(100);
+    let counts = robots.count_quads();
     counts.iter().product()
 }
 
@@ -125,13 +133,11 @@ pub fn part1(input: &str) -> u64 {
 pub fn part2(input: &str) -> u64 {
     let width = 101;
     let height = 103;
-    let mut robots = parse(input);
+    let mut robots = Robots::from_vec(parse(input, width, height), width, height);
     for i in 1.. {
-        for r in &mut robots {
-            r.step((width, height))
-        }
+        robots.step(1);
         // collect into lines
-        let g = as_grid(&robots, (width, height));
+        let g = robots.as_grid();
         if g.data
             .chunk_by(|a, b| *a != 0 && *b != 0)
             .filter(|c| !c.is_empty() && c[0] != 0)
