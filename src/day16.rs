@@ -1,8 +1,11 @@
-use aoc_runner_derive::{aoc, aoc_generator};
+use aoc_runner_derive::aoc;
 use grid::{AsCoord2d, Coord2d, Grid};
+use itertools::Itertools;
 use std::{
     collections::{BinaryHeap, HashMap},
+    i64,
     str::FromStr,
+    usize,
 };
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Ord, PartialOrd)]
@@ -23,7 +26,7 @@ impl FacingDirection {
         }
     }
     fn reachable(&self) -> [FacingDirection; 3] {
-        // Can move perpendicularly or the same direction, not backwards
+        // Can move perpendicularly or the same direction, backwards would always increase path cost
         match self {
             FacingDirection::East | FacingDirection::West => [*self, FacingDirection::North, FacingDirection::South],
             FacingDirection::South | FacingDirection::North => [*self, FacingDirection::East, FacingDirection::West],
@@ -36,6 +39,7 @@ struct State {
     cost: usize,
     position: Coord2d,
     facing: FacingDirection,
+    path: Vec<Coord2d>,
 }
 
 impl Ord for State {
@@ -56,35 +60,60 @@ impl PartialOrd for State {
 
 struct Maze {
     map: Grid<u8>,
+    paths: HashMap<usize, Vec<Vec<Coord2d>>>,
 }
 
 impl FromStr for Maze {
     type Err = Box<dyn std::error::Error>;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let map: Grid<u8> = s.parse()?;
+        let paths = HashMap::new();
 
-        Ok(Self { map })
+        Ok(Self { map, paths })
     }
 }
 
 impl Maze {
-    fn dijkstra(&mut self) -> usize {
+    fn dijkstra<const RECORD_PATHS: bool>(&mut self) -> usize {
         let start = self.map.find(&b'S').expect("can't find start").to_coord();
         let finish = self.map.find(&b'E').expect("can't find finish").to_coord();
 
         let mut distances = HashMap::new();
         let mut queue = BinaryHeap::with_capacity(self.map.data.len());
+        let mut best_cost = usize::MAX;
 
         distances.insert((start, FacingDirection::East), 0);
         queue.push(State {
             cost: 0,
             position: start,
             facing: FacingDirection::East,
+            path: Vec::new(),
         });
 
-        while let Some(State { cost, position, facing }) = queue.pop() {
+        while let Some(State {
+            cost,
+            position,
+            facing,
+            path,
+        }) = queue.pop()
+        {
+            let mut new_path = path.clone();
+            new_path.push(position);
+
             if position == finish {
-                return cost;
+                if RECORD_PATHS {
+                    if cost < best_cost {
+                        best_cost = cost
+                    }
+                    if !self.paths.contains_key(&cost) {
+                        self.paths.insert(cost, vec![new_path.clone()]);
+                    } else {
+                        self.paths.get_mut(&cost).unwrap().push(new_path.clone());
+                    }
+                    continue;
+                } else {
+                    return cost;
+                }
             }
 
             if distances.get(&(position, facing)).is_some_and(|v| cost > *v) {
@@ -100,18 +129,23 @@ impl Maze {
             {
                 if distances
                     .get(&(new_position, *new_dir))
-                    .is_none_or(|best_cost| new_cost < *best_cost)
+                    .is_none_or(|best_cost| new_cost <= *best_cost)
                 {
                     queue.push(State {
                         cost: new_cost,
                         position: new_position,
                         facing: *new_dir,
+                        path: new_path.clone(),
                     });
                     distances.insert((new_position, *new_dir), new_cost);
                 }
             }
         }
-        panic!("no path found");
+        if best_cost == usize::MAX || !RECORD_PATHS {
+            panic!("no path found");
+        } else {
+            return best_cost;
+        }
     }
 }
 
@@ -122,12 +156,21 @@ fn parse(input: &str) -> Maze {
 #[aoc(day16, part1)]
 pub fn part1(input: &str) -> usize {
     let mut maze = parse(input);
-    maze.dijkstra()
+    maze.dijkstra::<false>()
 }
 
 #[aoc(day16, part2)]
-pub fn part2(input: &str) -> i64 {
-    todo!()
+pub fn part2(input: &str) -> usize {
+    let mut maze = parse(input);
+    let best_cost = maze.dijkstra::<true>();
+    let best_paths = maze.paths.get(&best_cost).unwrap();
+    let best_path_tiles = best_paths.into_iter().flatten().collect_vec();
+
+    let mut path_map = maze.map.clone();
+    for tile in best_path_tiles {
+        path_map.set(&tile, b'O');
+    }
+    path_map.count(&b'O')
 }
 
 #[cfg(test)]
@@ -168,14 +211,22 @@ mod tests {
 #################";
 
     #[test]
-    fn part1_example() {
+    fn part1_example1() {
         assert_eq!(part1(EXAMPLE1), 7036);
+    }
+
+    #[test]
+    fn part1_example2() {
         assert_eq!(part1(EXAMPLE2), 11048);
     }
 
     #[test]
-    fn part2_example() {
-        assert_eq!(part2(EXAMPLE1), 0);
-        assert_eq!(part2(EXAMPLE2), 0);
+    fn part2_example1() {
+        assert_eq!(part2(EXAMPLE1), 45);
+    }
+
+    #[test]
+    fn part2_example2() {
+        assert_eq!(part2(EXAMPLE2), 64);
     }
 }
