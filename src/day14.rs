@@ -32,7 +32,7 @@ enum Quadrant {
 }
 
 fn nom_i64(input: &str) -> IResult<&str, i64> {
-    let (i, number) = map_res(recognize(preceded(opt(tag("-")), digit1)), |s| i64::from_str(s))(input)?;
+    let (i, number) = map_res(recognize(preceded(opt(tag("-")), digit1)), i64::from_str)(input)?;
     Ok((i, number))
 }
 fn nom_i64_pair(input: &str) -> IResult<&str, (i64, i64)> {

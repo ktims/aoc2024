@@ -16,7 +16,7 @@ impl Display for Warehouse {
 
 impl Warehouse {
     fn step_robot(&mut self, dir: Move) {
-        let start = self.robot_pos.clone();
+        let start = self.robot_pos;
         if self.push(&start, &dir) {
             self.robot_pos = &self.robot_pos + dir.ofs();
         }
@@ -40,12 +40,12 @@ impl Warehouse {
                     // move both parts
                     self.push(&target, dir);
                     self.push(&(&target + (-1, 0)), dir);
-                    self.map.swap(&target, pos);
+                    self.map.swap(target, pos);
                 }
                 b'[' => {
                     self.push(&target, dir);
                     self.push(&(&target + (1, 0)), dir);
-                    self.map.swap(&target, pos);
+                    self.map.swap(target, pos);
                 }
                 c => panic!("unexpected char {}", c),
             }

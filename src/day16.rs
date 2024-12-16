@@ -1,9 +1,9 @@
 use aoc_runner_derive::aoc;
 use grid::Grid;
 use std::{
+    cmp::Ordering,
     collections::{BinaryHeap, HashMap},
     str::FromStr,
-    usize,
 };
 
 type CoordType = i16;
@@ -73,7 +73,7 @@ impl Ord for PathState {
 }
 impl PartialOrd for PathState {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.state.partial_cmp(&other.state)
+        Some(self.cmp(other))
     }
 }
 
@@ -177,14 +177,18 @@ impl Maze {
                 continue;
             }
             if state.position == finish {
-                if state.cost < best_cost {
-                    path.push(state.position);
-                    best_paths.clear();
-                    best_paths.push(path);
-                    best_cost = state.cost
-                } else if state.cost == best_cost {
-                    path.push(state.position);
-                    best_paths.push(path);
+                match state.cost.cmp(&best_cost) {
+                    Ordering::Less => {
+                        path.push(state.position);
+                        best_paths.clear();
+                        best_paths.push(path);
+                        best_cost = state.cost
+                    }
+                    Ordering::Equal => {
+                        path.push(state.position);
+                        best_paths.push(path);
+                    }
+                    _ => {}
                 }
                 continue;
             }
@@ -204,7 +208,7 @@ impl Maze {
                 }
             }
         }
-        return (best_cost, best_paths);
+        (best_cost, best_paths)
     }
 }
 

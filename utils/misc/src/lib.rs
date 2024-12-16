@@ -1,6 +1,6 @@
 use num_traits::Signed;
+use std::fmt::Display;
 use std::ops::{Add, AddAssign};
-use std::fmt::{Debug, Display};
 
 /// Wrapped signed integer with custom upper bound with wrapping of 0s to the upper bound
 #[derive(Eq, Clone, Copy)]
@@ -71,7 +71,10 @@ impl<T: Signed + PartialOrd + Copy> PartialOrd<T> for CustomWrapped<T> {
     }
 }
 
-impl<T: Display + Signed + Copy> Display for CustomWrapped<T> where T: Display {
+impl<T: Display + Signed + Copy> Display for CustomWrapped<T>
+where
+    T: Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.val.fmt(f)
     }
