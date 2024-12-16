@@ -26,11 +26,13 @@ impl FacingDirection {
             FacingDirection::North => (0, -1),
         }
     }
-    fn reachable(&self) -> [FacingDirection; 3] {
+    fn reachable(&self) -> &[FacingDirection; 3] {
         // Can move perpendicularly or the same direction, backwards would always increase path cost
         match self {
-            FacingDirection::East | FacingDirection::West => [*self, FacingDirection::North, FacingDirection::South],
-            FacingDirection::South | FacingDirection::North => [*self, FacingDirection::East, FacingDirection::West],
+            FacingDirection::East => &[FacingDirection::East, FacingDirection::North, FacingDirection::South],
+            FacingDirection::West => &[FacingDirection::West, FacingDirection::North, FacingDirection::South],
+            FacingDirection::South => &[FacingDirection::South, FacingDirection::East, FacingDirection::West],
+            FacingDirection::North => &[FacingDirection::North, FacingDirection::East, FacingDirection::West],
         }
     }
 }
@@ -89,6 +91,22 @@ impl FromStr for Maze {
 }
 
 impl Maze {
+    fn valid_moves<'a>(&'a self, state: &'a State) -> impl Iterator<Item = State> + use<'a> {
+        let reachable = state.facing.reachable();
+        reachable
+            .iter()
+            .map(|dir| (dir, (state.position.0 + dir.ofs().0, state.position.1 + dir.ofs().1)))
+            .filter(|(_, pos)| self.map.get(pos).is_some_and(|c| *c != b'#'))
+            .map(|(dir, pos)| State {
+                facing: *dir,
+                position: pos,
+                cost: if *dir == state.facing {
+                    state.cost + 1
+                } else {
+                    state.cost + 1001
+                },
+            })
+    }
     fn dijkstra(&self) -> usize {
         let (start_x, start_y) = self.map.find(&b'S').expect("can't find start");
         let start = (start_x as CoordType, start_y as CoordType);
@@ -106,32 +124,25 @@ impl Maze {
             facing: FacingDirection::East,
         });
 
-        while let Some(State { cost, position, facing }) = queue.pop() {
-            if position == finish {
-                return cost;
+        while let Some(state) = queue.pop() {
+            if state.position == finish {
+                return state.cost;
             }
 
-            if distances.get(&(position, facing)).is_some_and(|v| cost > *v) {
+            if distances
+                .get(&(state.position, state.facing))
+                .is_some_and(|v| state.cost > *v)
+            {
                 continue;
             }
 
-            for (new_dir, new_position, new_cost) in facing
-                .reachable()
-                .iter()
-                .map(|dir| (dir, (position.0 + dir.ofs().0, position.1 + dir.ofs().1)))
-                .filter(|(_, pos)| self.map.get(pos).is_some_and(|c| *c != b'#'))
-                .map(|(dir, pos)| (dir, pos, if *dir == facing { cost + 1 } else { cost + 1001 }))
-            {
+            for new_state in self.valid_moves(&state) {
                 if distances
-                    .get(&(new_position, *new_dir))
-                    .is_none_or(|best_cost| new_cost < *best_cost)
+                    .get(&(new_state.position, new_state.facing))
+                    .is_none_or(|best_cost| new_state.cost < *best_cost)
                 {
-                    queue.push(State {
-                        cost: new_cost,
-                        position: new_position,
-                        facing: *new_dir,
-                    });
-                    distances.insert((new_position, *new_dir), new_cost);
+                    distances.insert((new_state.position, new_state.facing), new_state.cost);
+                    queue.push(new_state);
                 }
             }
         }
@@ -155,62 +166,41 @@ impl Maze {
                 position: start,
                 facing: FacingDirection::East,
             },
-            path: Vec::with_capacity(100),
+            path: Vec::new(),
         });
 
-        while let Some(PathState { state, path }) = queue.pop() {
-            let mut new_path = path.clone();
-            new_path.push(state.position);
-
-            if state.position == finish {
-                if state.cost < best_cost {
-                    best_paths.clear();
-                    best_paths.push(new_path);
-                    best_cost = state.cost
-                } else if state.cost == best_cost {
-                    best_paths.push(new_path);
-                }
-                continue;
-            }
-
+        while let Some(PathState { state, mut path }) = queue.pop() {
             if distances
                 .get(&(state.position, state.facing))
                 .is_some_and(|v| state.cost > *v)
             {
                 continue;
             }
+            if state.position == finish {
+                if state.cost < best_cost {
+                    path.push(state.position);
+                    best_paths.clear();
+                    best_paths.push(path);
+                    best_cost = state.cost
+                } else if state.cost == best_cost {
+                    path.push(state.position);
+                    best_paths.push(path);
+                }
+                continue;
+            }
 
-            for (new_dir, new_position, new_cost) in state
-                .facing
-                .reachable()
-                .iter()
-                .map(|dir| (dir, (state.position.0 + dir.ofs().0, state.position.1 + dir.ofs().1)))
-                .filter(|(_, pos)| self.map.get(pos).is_some_and(|c| *c != b'#'))
-                .map(|(dir, pos)| {
-                    (
-                        dir,
-                        pos,
-                        if *dir == state.facing {
-                            state.cost + 1
-                        } else {
-                            state.cost + 1001
-                        },
-                    )
-                })
-            {
+            for new_state in self.valid_moves(&state) {
                 if distances
-                    .get(&(new_position, *new_dir))
-                    .is_none_or(|best_cost| new_cost <= *best_cost)
+                    .get(&(new_state.position, new_state.facing))
+                    .is_none_or(|best_cost| new_state.cost <= *best_cost)
                 {
+                    let mut new_path = path.clone();
+                    new_path.push(state.position);
+                    distances.insert((new_state.position, new_state.facing), new_state.cost);
                     queue.push(PathState {
-                        state: State {
-                            cost: new_cost,
-                            position: new_position,
-                            facing: *new_dir,
-                        },
-                        path: new_path.clone(),
+                        state: new_state,
+                        path: new_path,
                     });
-                    distances.insert((new_position, *new_dir), new_cost);
                 }
             }
         }
@@ -233,11 +223,11 @@ pub fn part2(input: &str) -> usize {
     let mut maze = parse(input);
     let best_paths = maze.path_dijkstra();
 
-    let mut path_map = maze.map.clone();
-    for tile in best_paths.1.into_iter().flatten() {
-        path_map.set(&tile, b'O');
+    let mut path_map = maze.map.same_shape(false);
+    for tile in best_paths.1.iter().flatten() {
+        path_map.set(tile, true);
     }
-    path_map.count(&b'O')
+    path_map.count(&true)
 }
 
 #[cfg(test)]
