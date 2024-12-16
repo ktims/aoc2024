@@ -63,60 +63,22 @@ impl AsCoord2d for &Coord2d {
     }
 }
 
-impl AsCoord2d for (i32, i32) {
+impl<T> AsCoord2d for (T, T)
+where
+    T: Copy + TryInto<i64>,
+    <T as TryInto<i64>>::Error: Debug,
+{
     fn to_coord(self) -> Coord2d {
         Coord2d {
-            x: self.0.into(),
-            y: self.1.into(),
+            x: self.0.try_into().unwrap(),
+            y: self.1.try_into().unwrap(),
         }
     }
     fn x(&self) -> i64 {
-        self.0.into()
+        self.0.try_into().unwrap()
     }
     fn y(&self) -> i64 {
-        self.1.into()
-    }
-}
-
-impl AsCoord2d for (i64, i64) {
-    fn to_coord(self) -> Coord2d {
-        Coord2d { x: self.0, y: self.1 }
-    }
-    fn x(&self) -> i64 {
-        self.0
-    }
-    fn y(&self) -> i64 {
-        self.1
-    }
-}
-
-impl AsCoord2d for (usize, usize) {
-    fn to_coord(self) -> Coord2d {
-        Coord2d {
-            x: self.0 as i64,
-            y: self.1 as i64,
-        }
-    }
-    fn x(&self) -> i64 {
-        self.0 as i64
-    }
-    fn y(&self) -> i64 {
-        self.1 as i64
-    }
-}
-
-impl AsCoord2d for (u64, u64) {
-    fn to_coord(self) -> Coord2d {
-        Coord2d {
-            x: self.0 as i64,
-            y: self.1 as i64,
-        }
-    }
-    fn x(&self) -> i64 {
-        self.0 as i64
-    }
-    fn y(&self) -> i64 {
-        self.1 as i64
+        self.1.try_into().unwrap()
     }
 }
 

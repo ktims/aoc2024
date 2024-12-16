@@ -1,10 +1,13 @@
 use aoc_runner_derive::aoc;
-use grid::{AsCoord2d, Coord2d, Grid};
+use grid::Grid;
 use std::{
     collections::{BinaryHeap, HashMap},
     str::FromStr,
     usize,
 };
+
+type CoordType = i16;
+type Coord = (CoordType, CoordType);
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Ord, PartialOrd)]
 enum FacingDirection {
@@ -15,7 +18,7 @@ enum FacingDirection {
 }
 
 impl FacingDirection {
-    fn ofs(&self) -> (i32, i32) {
+    fn ofs(&self) -> (CoordType, CoordType) {
         match self {
             FacingDirection::East => (1, 0),
             FacingDirection::South => (0, 1),
@@ -35,7 +38,7 @@ impl FacingDirection {
 #[derive(Clone, Eq, PartialEq, Debug)]
 struct State {
     cost: usize,
-    position: (i32, i32),
+    position: Coord,
     facing: FacingDirection,
 }
 
@@ -58,7 +61,7 @@ impl PartialOrd for State {
 #[derive(Clone, Eq, PartialEq, Debug)]
 struct PathState {
     state: State,
-    path: Vec<(i32, i32)>,
+    path: Vec<Coord>,
 }
 
 impl Ord for PathState {
@@ -88,10 +91,10 @@ impl FromStr for Maze {
 impl Maze {
     fn dijkstra(&self) -> usize {
         let (start_x, start_y) = self.map.find(&b'S').expect("can't find start");
-        let start = (start_x as i32, start_y as i32);
+        let start = (start_x as CoordType, start_y as CoordType);
 
         let (finish_x, finish_y) = self.map.find(&b'E').expect("can't find finish");
-        let finish = (finish_x as i32, finish_y as i32);
+        let finish = (finish_x as CoordType, finish_y as CoordType);
 
         let mut distances = HashMap::new();
         let mut queue = BinaryHeap::new();
@@ -134,7 +137,7 @@ impl Maze {
         }
         usize::MAX
     }
-    fn path_dijkstra(&mut self) -> (usize, Vec<Vec<(i32, i32)>>) {
+    fn path_dijkstra(&mut self) -> (usize, Vec<Vec<Coord>>) {
         let (start_x, start_y) = self.map.find(&b'S').expect("can't find start");
         let start = (start_x.try_into().unwrap(), start_y.try_into().unwrap());
         let (finish_x, finish_y) = self.map.find(&b'E').expect("can't find finish");
