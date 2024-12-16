@@ -137,7 +137,6 @@ pub fn part2(input: &str) -> u64 {
             .filter(|c| !c.is_empty() && c[0] != 0)
             .any(|c| c.len() > width as usize / 10)
         {
-            display(&robots, (width, height));
             return i;
         }
     }
