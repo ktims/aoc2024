@@ -181,6 +181,12 @@ impl<T: Clone + Eq + PartialEq + Debug> Grid<T> {
             None => None,
         }
     }
+    pub fn get_mut<C: AsCoord2d>(&mut self, c: &C) -> Option<&mut T> {
+        match self.valid_pos(c) {
+            Some(pos) => Some(self.data.get_mut(pos).unwrap()),
+            None => None,
+        }
+    }
     pub fn set<C: AsCoord2d>(&mut self, c: &C, mut val: T) -> Option<T> {
         match self.valid_pos(c) {
             Some(pos) => {
