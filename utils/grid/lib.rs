@@ -7,7 +7,7 @@ use std::{
     str::FromStr,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Coord2d {
     pub x: i64,
     pub y: i64,
@@ -126,7 +126,7 @@ pub struct Grid<T> {
     width: i64,
 }
 
-impl<T: Clone + Eq + PartialEq + Display + Debug> Grid<T> {
+impl<T: Clone + Eq + PartialEq + Debug> Grid<T> {
     pub fn new(width: i64) -> Self {
         Self {
             data: Vec::new(),
@@ -134,7 +134,7 @@ impl<T: Clone + Eq + PartialEq + Display + Debug> Grid<T> {
         }
     }
     /// Returns a new [Grid] with the same shape (width x height) as `self`, filled with `fill`
-    pub fn same_shape<NT: Clone + Eq + PartialEq + Display + Debug>(&self, fill: NT) -> Grid<NT> {
+    pub fn same_shape<NT: Clone + Eq + PartialEq + Debug>(&self, fill: NT) -> Grid<NT> {
         Grid {
             data: Vec::from_iter(repeat(fill).take(self.width() * self.height())),
             width: self.width,
