@@ -33,8 +33,8 @@ enum Opcode {
     cdv = 7,
 }
 
-impl From<usize> for Opcode {
-    fn from(value: usize) -> Self {
+impl From<i64> for Opcode {
+    fn from(value: i64) -> Self {
         match value {
             0 => Opcode::adv,
             1 => Opcode::bxl,
@@ -97,12 +97,15 @@ struct RegisterFile<const SIZE: usize, T> {
     file: [T; SIZE],
 }
 
-impl<T, const SIZE: usize> RegisterFile<SIZE, T> {
+impl<T: Clone + From<i64>, const SIZE: usize> RegisterFile<SIZE, T> {
     fn load(&self, reg: Register) -> &T {
         &self.file[reg as usize]
     }
     fn store(&mut self, reg: Register, val: T) {
         self.file[reg as usize] = val;
+    }
+    fn reset(&mut self) {
+        self.file.fill(0.into());
     }
 }
 
@@ -113,9 +116,6 @@ struct Instruction {
 }
 
 impl Instruction {
-    fn new(opcode: Opcode, operand: Operand) -> Self {
-        Self { opcode, operand }
-    }
     fn exec(&self, m: &mut Machine) {
         match self.opcode {
             Opcode::adv => self.adv(m),
@@ -178,9 +178,10 @@ impl Instruction {
 }
 
 #[derive(Debug)]
-struct Machine {
+pub struct Machine {
     registers: RegisterFile<3, i64>,
     program: Vec<Instruction>,
+    program_raw: Vec<i64>,
     ip: usize,
     out_file: Vec<i64>,
 }
@@ -202,6 +203,11 @@ impl Machine {
     fn jump(&mut self, addr: usize) {
         self.ip = addr;
     }
+    fn reset(&mut self) {
+        self.registers.reset();
+        self.ip = 0;
+        self.out_file.clear();
+    }
 }
 
 fn parse(input: &str) -> Machine {
@@ -210,6 +216,7 @@ fn parse(input: &str) -> Machine {
 
     let mut registers: RegisterFile<3, i64> = RegisterFile { file: [0; 3] };
     let mut program = Vec::new();
+    let mut program_raw = Vec::new();
     for line in input.lines() {
         if let Some(caps) = reg_re.captures(line) {
             let address = (caps[1].as_bytes()[0] - b'A') as usize;
@@ -220,10 +227,13 @@ fn parse(input: &str) -> Machine {
         if let Some(caps) = prog_re.captures(line) {
             let instructions = caps[1].split(',');
             for (inst, operand) in instructions.tuples() {
-                let opcode: Opcode = inst.parse::<usize>().unwrap().into();
-                let operand = operand.parse::<i64>().unwrap().into();
+                let opcode = inst.parse::<i64>().unwrap();
+                let operand = operand.parse::<i64>().unwrap();
+                program_raw.push(opcode);
+                program_raw.push(operand);
+                let opcode: Opcode = opcode.into();
                 program.push(Instruction {
-                    operand: opcode.interp_operand(operand),
+                    operand: opcode.interp_operand(operand as i64),
                     opcode,
                 });
             }
@@ -233,6 +243,7 @@ fn parse(input: &str) -> Machine {
     Machine {
         registers,
         program,
+        program_raw,
         out_file: Vec::new(),
         ip: 0,
     }
@@ -245,27 +256,56 @@ pub fn part1(input: &str) -> String {
     machine.out_file.iter().map(|n| n.to_string()).join(",")
 }
 
+pub fn solve(m: &mut Machine, guess: i64, i: usize) -> Option<i64> {
+    if i as usize == m.program_raw.len() {
+        return Some(guess as i64);
+    }
+    let program_pos = m.program_raw.len() - 1 - i;
+    let goal_digit = m.program_raw[program_pos];
+
+    for digit in 0..8 {
+        let local_guess = (digit << (program_pos*3)) + guess;
+        m.reset();
+        m.registers.store(Register::A, local_guess);
+        m.run();
+        if m.out_file.len() == m.program_raw.len() && m.out_file[program_pos] == goal_digit {
+            if let Some(sol) = solve(m, local_guess, i+1) {
+                return Some(sol)
+            }
+        }
+    }
+    None
+}
+
 #[aoc(day17, part2)]
 pub fn part2(input: &str) -> i64 {
-    0
+    let mut machine = parse(input);
+
+    return solve(&mut machine, 0, 0).expect("expected a solution");
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    const EXAMPLE: &str = "Register A: 729
+    const EXAMPLE1: &str = "Register A: 729
 Register B: 0
 Register C: 0
 
 Program: 0,1,5,4,3,0";
 
+    const EXAMPLE2: &str = "Register A: 2024
+Register B: 0
+Register C: 0
+
+Program: 0,3,5,4,3,0";
+
     #[test]
     fn part1_example() {
-        assert_eq!(part1(EXAMPLE), "4,6,3,5,6,3,5,2,1,0");
+        assert_eq!(part1(EXAMPLE1), "4,6,3,5,6,3,5,2,1,0");
     }
 
     #[test]
     fn part2_example() {
-        assert_eq!(part2(EXAMPLE), 0);
+        assert_eq!(part2(EXAMPLE2), 117440);
     }
 }
