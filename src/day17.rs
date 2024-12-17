@@ -1,5 +1,3 @@
-use std::{ops::BitXor, str::FromStr};
-
 use aoc_runner_derive::aoc;
 use itertools::Itertools;
 use regex::Regex;
@@ -23,27 +21,27 @@ impl From<usize> for Register {
 
 #[derive(Debug, Clone, Copy)]
 enum Opcode {
-    adv = 0,
-    bxl = 1,
-    bst = 2,
-    jnz = 3,
-    bxc = 4,
-    out = 5,
-    bdv = 6,
-    cdv = 7,
+    Adv = 0,
+    Bxl = 1,
+    Bst = 2,
+    Jnz = 3,
+    Bxc = 4,
+    Out = 5,
+    Bdv = 6,
+    Cdv = 7,
 }
 
 impl From<i64> for Opcode {
     fn from(value: i64) -> Self {
         match value {
-            0 => Opcode::adv,
-            1 => Opcode::bxl,
-            2 => Opcode::bst,
-            3 => Opcode::jnz,
-            4 => Opcode::bxc,
-            5 => Opcode::out,
-            6 => Opcode::bdv,
-            7 => Opcode::cdv,
+            0 => Opcode::Adv,
+            1 => Opcode::Bxl,
+            2 => Opcode::Bst,
+            3 => Opcode::Jnz,
+            4 => Opcode::Bxc,
+            5 => Opcode::Out,
+            6 => Opcode::Bdv,
+            7 => Opcode::Cdv,
             v => panic!("invalid opcode {}", v),
         }
     }
@@ -52,9 +50,9 @@ impl From<i64> for Opcode {
 impl Opcode {
     fn interp_operand(&self, value: i64) -> Operand {
         match self {
-            Self::adv | Self::bst | Self::out | Self::bdv | Self::cdv => Operand::new_combo(value),
-            Self::bxl | Self::jnz => Operand::Literal(value),
-            Self::bxc => Operand::Ignore,
+            Self::Adv | Self::Bst | Self::Out | Self::Bdv | Self::Cdv => Operand::new_combo(value),
+            Self::Bxl | Self::Jnz => Operand::Literal(value),
+            Self::Bxc => Operand::Ignore,
         }
     }
 }
@@ -82,12 +80,6 @@ impl Operand {
             Self::Literal(i) => i,
             Self::Load(reg) => *m.registers.load(reg),
             Self::Ignore => panic!("can't read ignored operand"),
-        }
-    }
-    fn is_literal(self) -> bool {
-        match self {
-            Self::Literal(_) => true,
-            _ => false,
         }
     }
 }
@@ -118,16 +110,14 @@ struct Instruction {
 impl Instruction {
     fn exec(&self, m: &mut Machine) {
         match self.opcode {
-            Opcode::adv => self.adv(m),
-            Opcode::bxl => self.bxl(m),
-            Opcode::bst => self.bst(m),
-            Opcode::jnz => self.jnz(m),
-            Opcode::bxc => self.bxc(m),
-            Opcode::out => self.out(m),
-            Opcode::bdv => self.bdv(m),
-            Opcode::cdv => self.cdv(m),
-
-            _ => unimplemented!(),
+            Opcode::Adv => self.adv(m),
+            Opcode::Bxl => self.bxl(m),
+            Opcode::Bst => self.bst(m),
+            Opcode::Jnz => self.jnz(m),
+            Opcode::Bxc => self.bxc(m),
+            Opcode::Out => self.out(m),
+            Opcode::Bdv => self.bdv(m),
+            Opcode::Cdv => self.cdv(m),
         }
     }
     fn adv(&self, m: &mut Machine) {
@@ -139,7 +129,7 @@ impl Instruction {
     fn bxl(&self, m: &mut Machine) {
         let lhs = self.operand.value(m);
         let rhs = m.registers.load(Register::B);
-        m.registers.store(Register::B, lhs.bitxor(rhs));
+        m.registers.store(Register::B, lhs ^ rhs);
         m.advance();
     }
     fn bst(&self, m: &mut Machine) {
@@ -154,9 +144,9 @@ impl Instruction {
         }
     }
     fn bxc(&self, m: &mut Machine) {
-        let a = m.registers.load(Register::B);
-        let b = m.registers.load(Register::C);
-        m.registers.store(Register::B, a.bitxor(b));
+        let lhs = m.registers.load(Register::B);
+        let rhs = m.registers.load(Register::C);
+        m.registers.store(Register::B, lhs ^ rhs);
         m.advance();
     }
     fn out(&self, m: &mut Machine) {
@@ -189,12 +179,8 @@ pub struct Machine {
 impl Machine {
     fn run(&mut self) {
         let program = self.program.clone();
-        loop {
-            if let Some(inst) = program.get(self.ip) {
-                inst.exec(self);
-            } else {
-                break;
-            }
+        while let Some(inst) = program.get(self.ip) {
+            inst.exec(self);
         }
     }
     fn advance(&mut self) {
@@ -233,7 +219,7 @@ fn parse(input: &str) -> Machine {
                 program_raw.push(operand);
                 let opcode: Opcode = opcode.into();
                 program.push(Instruction {
-                    operand: opcode.interp_operand(operand as i64),
+                    operand: opcode.interp_operand(operand),
                     opcode,
                 });
             }
@@ -256,21 +242,22 @@ pub fn part1(input: &str) -> String {
     machine.out_file.iter().map(|n| n.to_string()).join(",")
 }
 
+// The program must be of the correct form to be solvable
 pub fn solve(m: &mut Machine, guess: i64, i: usize) -> Option<i64> {
-    if i as usize == m.program_raw.len() {
-        return Some(guess as i64);
+    if i == m.program_raw.len() {
+        return Some(guess);
     }
     let program_pos = m.program_raw.len() - 1 - i;
     let goal_digit = m.program_raw[program_pos];
 
     for digit in 0..8 {
-        let local_guess = (digit << (program_pos*3)) + guess;
+        let local_guess = (digit << (program_pos * 3)) + guess;
         m.reset();
         m.registers.store(Register::A, local_guess);
         m.run();
         if m.out_file.len() == m.program_raw.len() && m.out_file[program_pos] == goal_digit {
-            if let Some(sol) = solve(m, local_guess, i+1) {
-                return Some(sol)
+            if let Some(sol) = solve(m, local_guess, i + 1) {
+                return Some(sol);
             }
         }
     }
@@ -281,7 +268,7 @@ pub fn solve(m: &mut Machine, guess: i64, i: usize) -> Option<i64> {
 pub fn part2(input: &str) -> i64 {
     let mut machine = parse(input);
 
-    return solve(&mut machine, 0, 0).expect("expected a solution");
+    solve(&mut machine, 0, 0).expect("expected a solution")
 }
 
 #[cfg(test)]
