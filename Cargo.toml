@@ -21,3 +21,5 @@ thread_local = "1.1.8"
 
 [profile.release]
 lto = true
+opt-level = 3
+overflow-checks = false
