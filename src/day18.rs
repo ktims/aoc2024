@@ -1,31 +1,27 @@
-use std::{cmp::Reverse, collections::{BinaryHeap, HashMap, VecDeque}};
+use std::{cmp::Reverse, collections::BinaryHeap};
 
 use aoc_runner_derive::aoc;
 use grid::Grid;
 
+#[derive(Clone)]
 struct MemoryMap {
     map: Grid<bool>,
-    byte_stream: Vec<(i64, i64)>
+    byte_stream: Vec<(i64, i64)>,
 }
 
 impl MemoryMap {
-    fn from_str(input: &str, width: usize, height: usize, n: Option<usize>) -> Self {
-        let mut map = Grid::with_shape(width, height, true);
+    fn from_str(input: &str, width: usize, height: usize) -> Self {
+        let map = Grid::with_shape(width, height, true);
         let mut byte_stream = Vec::new();
-        let mut count = 0;
+
         for line in input.lines() {
             if let Some((x, y)) = line.split_once(',') {
                 let pos: (i64, i64) = (x.parse().unwrap(), y.parse().unwrap());
                 byte_stream.push(pos);
-
-            }
-            count += 1;
-            if n.is_some_and(|n| count == n) {
-                break;
             }
         }
 
-        Self { map , byte_stream }
+        Self { map, byte_stream }
     }
     fn place_byte(&mut self, i: usize) {
         let pos = self.byte_stream[i];
@@ -33,8 +29,9 @@ impl MemoryMap {
             panic!("corruption outside memory bounds");
         }
     }
-    fn place_all_bytes(&mut self) {
-        for i in 0..self.byte_stream.len() {
+    fn place_bytes(&mut self, n: usize) {
+        assert!(n < self.byte_stream.len());
+        for i in 0..n {
             self.place_byte(i);
         }
     }
@@ -47,7 +44,7 @@ impl MemoryMap {
             .collect()
     }
 
-    fn dijkstra(&self) -> Option<Vec<(i64, i64)>>  {
+    fn dijkstra(&self) -> Option<Vec<(i64, i64)>> {
         let start = (0i64, 0i64);
         let goal = (self.map.width() as i64 - 1, self.map.height() as i64 - 1);
 
@@ -88,11 +85,16 @@ impl MemoryMap {
 }
 
 pub fn part1_impl(input: &str, width: usize, height: usize, n: usize) -> usize {
-    let mut map = MemoryMap::from_str(input, width, height, Some(n));
-    map.place_all_bytes();
+    let mut map = MemoryMap::from_str(input, width, height);
+    map.place_bytes(n);
     let path = map.dijkstra().expect("no path found");
     let mut sol_map = map.map.same_shape(b'.');
-    sol_map.data = map.map.data.iter().map(|clear| if *clear { b'.' } else { b'#' }).collect();
+    sol_map.data = map
+        .map
+        .data
+        .iter()
+        .map(|clear| if *clear { b'.' } else { b'#' })
+        .collect();
     for visited in &path {
         sol_map.set(visited, b'O');
     }
@@ -100,13 +102,21 @@ pub fn part1_impl(input: &str, width: usize, height: usize, n: usize) -> usize {
     path.len() - 2 // count vertexes, not visited nodes
 }
 
-pub fn part2_impl(input: &str, width: usize, height: usize) -> (i64, i64) {
-    let mut map = MemoryMap::from_str(input, width, height, None);
+pub fn part2_impl(input: &str, width: usize, height: usize, n: usize) -> (i64, i64) {
+    let mut input_map = MemoryMap::from_str(input, width, height);
 
-    for byte in 0..map.byte_stream.len() {
-        map.place_byte(byte);
-        if map.dijkstra().is_none() {
-            return map.byte_stream[byte]
+    input_map.place_bytes(n);
+    let mut path = input_map.dijkstra().expect("no path found");
+
+    for byte in n..input_map.byte_stream.len() {
+        input_map.place_byte(byte);
+        if path.contains(&input_map.byte_stream[byte]) {
+            if let Some(new_path) = input_map.dijkstra() {
+                path = new_path;
+            } else {
+                println!("obstruction found on trial {}", byte);
+                return input_map.byte_stream[byte];
+            }
         }
     }
     panic!("no bytes block route");
@@ -119,7 +129,7 @@ pub fn part1(input: &str) -> usize {
 
 #[aoc(day18, part2)]
 pub fn part2(input: &str) -> String {
-    let sol = part2_impl(input, 71, 71);
+    let sol = part2_impl(input, 71, 71, 1024);
     format!("{},{}", sol.0, sol.1)
 }
 
@@ -159,6 +169,6 @@ mod tests {
 
     #[test]
     fn part2_example() {
-        assert_eq!(part2_impl(EXAMPLE, 7, 7), (6, 1));
+        assert_eq!(part2_impl(EXAMPLE, 7, 7, 12), (6, 1));
     }
 }
