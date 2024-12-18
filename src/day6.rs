@@ -99,8 +99,7 @@ pub struct Map {
 impl<T: BufRead> From<T> for Map {
     fn from(input: T) -> Self {
         let grid = Grid::from(input);
-        let mut visited_from: Grid<DirectionSet> = Grid::new(grid.width() as i64);
-        visited_from.data.resize(grid.data.len(), DirectionSet::empty());
+        let visited_from = grid.same_shape(DirectionSet::empty());
         let guard_pos = grid.find(&b'^').expect("Guard not found");
         let guard_facing = FacingDirection::Up;
         Self {

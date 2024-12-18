@@ -1,7 +1,7 @@
 use std::{
     fmt::{Debug, Display, Formatter, Write},
     io::{BufRead, Cursor},
-    iter::repeat,
+    iter::repeat_n,
     mem::swap,
     ops::{Add, AddAssign, Sub},
     str::FromStr,
@@ -82,29 +82,76 @@ where
     }
 }
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Debug)]
+pub struct GridRowIter<'a, T> {
+    iter: std::slice::Iter<'a, T>,
+}
+
+impl<'a, T: Clone + Eq + PartialEq + Debug> GridRowIter<'a, T> {
+    fn new(grid: &'a Grid<T>, y: i64) -> Self {
+        let iter = grid.data[y as usize * grid.width()..(y as usize + 1) * grid.width()].iter();
+        Self { iter }
+    }
+}
+
+impl<'a, T> Iterator for GridRowIter<'a, T> {
+    type Item = &'a T;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next()
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+}
+
+#[derive(Debug)]
+pub struct GridColIter<'a, T> {
+    grid: &'a Grid<T>,
+    stride: usize,
+    cur: usize,
+}
+
+impl<'a, T: Clone + Eq + PartialEq + Debug> GridColIter<'a, T> {
+    fn new(grid: &'a Grid<T>, x: i64) -> Self {
+        Self {
+            grid,
+            stride: grid.width(),
+            cur: x as usize,
+        }
+    }
+}
+
+impl<'a, T: Clone + Eq + PartialEq + Debug> Iterator for GridColIter<'a, T> {
+    type Item = &'a T;
+    fn next(&mut self) -> Option<Self::Item> {
+        let cur = self.cur;
+        self.cur += self.stride;
+        if cur < self.grid.data.len() {
+            Some(&self.grid.data[cur])
+        } else {
+            None
+        }
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.grid.height() - 1, Some(self.grid.height() - 1))
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Grid<T> {
     pub data: Vec<T>,
     width: i64,
 }
 
 impl<T: Clone + Eq + PartialEq + Debug> Grid<T> {
-    pub fn new(width: i64) -> Self {
-        Self {
-            data: Vec::new(),
-            width,
-        }
-    }
     /// Returns a new [Grid] with the same shape (width x height) as `self`, filled with `fill`
     pub fn same_shape<NT: Clone + Eq + PartialEq + Debug>(&self, fill: NT) -> Grid<NT> {
-        Grid {
-            data: Vec::from_iter(repeat(fill).take(self.width() * self.height())),
-            width: self.width,
-        }
+        Grid::with_shape(self.width(), self.height(), fill)
     }
+    /// Returns a new [Grid] with the given shape (width x height), filled with `fill`
     pub fn with_shape(width: usize, height: usize, fill: T) -> Self {
         Self {
-            data: Vec::from_iter(repeat(fill).take(width * height)),
+            data: Vec::from_iter(repeat_n(fill, width * height)),
             width: width as i64,
         }
     }
@@ -178,9 +225,25 @@ impl<T: Clone + Eq + PartialEq + Debug> Grid<T> {
         }
     }
 
+    pub fn row_iter(&self, y: i64) -> Option<GridRowIter<T>> {
+        if (y as usize) < self.height() {
+            Some(GridRowIter::new(self, y))
+        } else {
+            None
+        }
+    }
+
     pub fn col(&self, x: i64) -> Option<Vec<&T>> {
-        if x < self.width() as i64 && x >= 0 {
-            Some((0..self.height()).map(|y| self.get(&(x, y as i64)).unwrap()).collect())
+        if let Some(iter) = self.col_iter(x) {
+            Some(iter.collect())
+        } else {
+            None
+        }
+    }
+
+    pub fn col_iter(&self, x: i64) -> Option<GridColIter<T>> {
+        if (x as usize) < self.width() {
+            Some(GridColIter::new(self, x))
         } else {
             None
         }
@@ -348,6 +411,28 @@ FBCG";
         assert_eq!(grid.forward_slice(&(2, 0), 2), Some(b"CD".as_slice()));
         assert_eq!(grid.forward_slice(&(2, 0), 3), None);
         assert_eq!(grid.forward_slice(&(0, 2), 4), Some(b"IJKL".as_slice()));
+    }
+
+    #[test]
+    fn row_iter() {
+        let grid = unchecked_load();
+        assert_eq!(
+            grid.row_iter(2).unwrap().collect::<Vec<_>>(),
+            [&b'I', &b'J', &b'K', &b'L']
+        );
+        assert!(grid.row_iter(-1).is_none());
+        assert!(grid.row_iter(4).is_none());
+    }
+
+    #[test]
+    fn col_iter() {
+        let grid = unchecked_load();
+        assert_eq!(
+            grid.col_iter(2).unwrap().collect::<Vec<_>>(),
+            [&b'C', &b'G', &b'K', &b'C']
+        );
+        assert!(grid.col_iter(-1).is_none());
+        assert!(grid.col_iter(4).is_none());
     }
 
     // #[test]
