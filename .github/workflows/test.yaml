@@ -19,6 +19,7 @@ jobs:
         cache: true
         components: clippy, rustfmt
         toolchain: stable
+        rustflags: ""
 
     - name: install cargo-aoc
       run: cargo install --locked cargo-aoc
