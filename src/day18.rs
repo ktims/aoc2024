@@ -1,7 +1,7 @@
 use aoc_runner_derive::aoc;
 use grid::Grid;
 use itertools::Itertools;
-use std::{cmp::Reverse, collections::BinaryHeap};
+use std::{cmp::Reverse, collections::{BinaryHeap, VecDeque}};
 
 #[derive(Clone)]
 struct MemoryMap {
@@ -80,6 +80,53 @@ impl MemoryMap {
             .map(|ofs| (pos.0 + ofs.0, pos.1 + ofs.1))
     }
 
+    fn bfs<T: PathTrack>(&self, start: (i64, i64)) -> Option<T> {
+        let goal = (self.map.width() as i64 - 1, self.map.height() as i64 - 1);
+
+        let mut visited = self.map.same_shape(false);
+        let mut prev = self.map.same_shape((i64::MAX, i64::MAX));
+        let mut queue = VecDeque::new();
+
+        visited.set(&start, true);
+        queue.push_back((0, start));
+
+        while let Some((depth, pos)) = queue.pop_front() {
+            if pos == goal {
+                if T::DOES_WORK {
+                    let mut visited_pos = goal;
+                    let mut path = T::new();
+                    path.push(pos);
+                    while let Some(next) = prev.get(&visited_pos) {
+                        visited_pos = *next;
+                        path.push(*next);
+                        if *next == start {
+                            path.finalize();
+                            return Some(path);
+                        }
+                    }
+                } else {
+                    return Some(T::new());
+                }
+            }
+
+            // if visited.get(&pos).is_some_and(|v| *v) {
+            //     continue;
+            // }
+
+            let moves = self.valid_moves(&pos);
+            for new_pos in moves {
+                if visited.get(&new_pos).is_none_or(|v| !v) {
+                    visited.set(&new_pos, true);
+                    if T::DOES_WORK {
+                        prev.set(&new_pos, pos);
+                    }
+                    queue.push_back((depth + 1, new_pos));
+                }
+            }
+        }
+        None
+    }
+
     fn dijkstra<T: PathTrack>(&self, start: (i64, i64)) -> Option<T> {
         let goal = (self.map.width() as i64 - 1, self.map.height() as i64 - 1);
 
@@ -131,7 +178,7 @@ impl MemoryMap {
 pub fn part1_impl(input: &str, width: usize, height: usize, initial_safe_byte_count: usize) -> usize {
     let mut map = MemoryMap::from_str(input, width, height);
     map.place_bytes(0, initial_safe_byte_count - 1);
-    let path = map.dijkstra::<LengthPath>((0, 0)).expect("no path found");
+    let path = map.bfs::<LengthPath>((0, 0)).expect("no path found");
 
     path.0 - 1 // count edges, not visited nodes (start doesn't count)
 }
@@ -141,7 +188,7 @@ pub fn part2_impl_brute(input: &str, width: usize, height: usize, initial_safe_b
     let mut input_map = MemoryMap::from_str(input, width, height);
     input_map.place_bytes(0, initial_safe_byte_count - 1);
 
-    let mut path = input_map.dijkstra::<Vec<(i64, i64)>>((0, 0)).expect("no path found");
+    let mut path = input_map.bfs::<Vec<(i64, i64)>>((0, 0)).expect("no path found");
 
     for byte in initial_safe_byte_count..input_map.byte_stream.len() {
         input_map.place_byte(byte);
@@ -149,7 +196,7 @@ pub fn part2_impl_brute(input: &str, width: usize, height: usize, initial_safe_b
         if let Some((obs_at, _)) = path.iter().find_position(|v| *v == &input_map.byte_stream[byte]) {
             let (before, _) = path.split_at(obs_at);
 
-            if let Some(new_path) = input_map.dijkstra::<Vec<(i64, i64)>>(path[obs_at - 1]) {
+            if let Some(new_path) = input_map.bfs::<Vec<(i64, i64)>>(path[obs_at - 1]) {
                 path = [before, &new_path].concat();
             } else {
                 return input_map.byte_stream[byte];
@@ -172,7 +219,7 @@ pub fn part2_impl(input: &str, width: usize, height: usize, initial_safe_byte_co
         // avoiding this clone by rolling back the byte placements instead is slower
         let mut local_map = input_map.clone();
         local_map.place_bytes(initial_safe_byte_count, *byte);
-        local_map.dijkstra::<NoopTrack>((0, 0)).is_some()
+        local_map.bfs::<NoopTrack>((0, 0)).is_some()
     }) + initial_safe_byte_count;
 
     return input_map.byte_stream[solution];
