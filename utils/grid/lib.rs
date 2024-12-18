@@ -128,7 +128,7 @@ impl<T: Clone + Eq + PartialEq + Debug> Grid<T> {
         if c.x() < 0 || c.x() >= self.width {
             return None;
         }
-        if c.y() < 0 || c.y() >= self.data.len() as i64 / self.width {
+        if c.y() < 0 || c.y() as usize >= self.height() {
             return None;
         }
         let pos = self.pos(c);
@@ -208,9 +208,8 @@ impl<T: Clone + Eq + PartialEq + Debug> Grid<T> {
     }
 
     pub fn swap<A: AsCoord2d, B: AsCoord2d>(&mut self, a: A, b: B) {
-        match (self.valid_pos(&a), self.valid_pos(&b)) {
-            (Some(a), Some(b)) => self.data.swap(a, b),
-            _ => {}
+        if let (Some(a), Some(b)) = (self.valid_pos(&a), self.valid_pos(&b)) {
+            self.data.swap(a, b)
         }
     }
 
