@@ -1,7 +1,10 @@
 use aoc_runner_derive::aoc;
 use grid::Grid;
 use itertools::Itertools;
-use std::{cmp::Reverse, collections::{BinaryHeap, VecDeque}};
+use std::{
+    cmp::Reverse,
+    collections::{BinaryHeap, VecDeque},
+};
 
 #[derive(Clone)]
 struct MemoryMap {
@@ -127,6 +130,7 @@ impl MemoryMap {
         None
     }
 
+    #[allow(dead_code)] // will be moved to Grid at some point
     fn dijkstra<T: PathTrack>(&self, start: (i64, i64)) -> Option<T> {
         let goal = (self.map.width() as i64 - 1, self.map.height() as i64 - 1);
 
@@ -222,7 +226,7 @@ pub fn part2_impl(input: &str, width: usize, height: usize, initial_safe_byte_co
         local_map.bfs::<NoopTrack>((0, 0)).is_some()
     }) + initial_safe_byte_count;
 
-    return input_map.byte_stream[solution];
+    input_map.byte_stream[solution]
 }
 
 #[aoc(day18, part1)]
