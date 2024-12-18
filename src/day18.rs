@@ -5,26 +5,38 @@ use grid::Grid;
 
 struct MemoryMap {
     map: Grid<bool>,
+    byte_stream: Vec<(i64, i64)>
 }
 
 impl MemoryMap {
-    fn from_str(input: &str, width: usize, height: usize, n: usize) -> Self {
+    fn from_str(input: &str, width: usize, height: usize, n: Option<usize>) -> Self {
         let mut map = Grid::with_shape(width, height, true);
+        let mut byte_stream = Vec::new();
         let mut count = 0;
         for line in input.lines() {
             if let Some((x, y)) = line.split_once(',') {
                 let pos: (i64, i64) = (x.parse().unwrap(), y.parse().unwrap());
-                if map.set(&pos, false).is_none() {
-                    panic!("corruption outside memory bounds");
-                }
+                byte_stream.push(pos);
+
             }
             count += 1;
-            if count == n {
+            if n.is_some_and(|n| count == n) {
                 break;
             }
         }
 
-        Self { map }
+        Self { map , byte_stream }
+    }
+    fn place_byte(&mut self, i: usize) {
+        let pos = self.byte_stream[i];
+        if self.map.set(&pos, false).is_none() {
+            panic!("corruption outside memory bounds");
+        }
+    }
+    fn place_all_bytes(&mut self) {
+        for i in 0..self.byte_stream.len() {
+            self.place_byte(i);
+        }
     }
 
     fn valid_moves(&self, pos: &(i64, i64)) -> Vec<(i64, i64)> {
@@ -35,7 +47,7 @@ impl MemoryMap {
             .collect()
     }
 
-    fn dijkstra(&self) -> Vec<(i64, i64)> {
+    fn dijkstra(&self) -> Option<Vec<(i64, i64)>>  {
         let start = (0i64, 0i64);
         let goal = (self.map.width() as i64 - 1, self.map.height() as i64 - 1);
 
@@ -56,7 +68,7 @@ impl MemoryMap {
                     visited_pos = *next;
                     visited.push(*next);
                 }
-                return visited;
+                return Some(visited);
             }
 
             if distances.get(&pos).is_some_and(|v| cost.0 > *v) {
@@ -71,13 +83,14 @@ impl MemoryMap {
                 }
             }
         }
-        panic!("no path found");
+        None
     }
 }
 
 pub fn part1_impl(input: &str, width: usize, height: usize, n: usize) -> usize {
-    let map = MemoryMap::from_str(input, width, height, n);
-    let path = map.dijkstra();
+    let mut map = MemoryMap::from_str(input, width, height, Some(n));
+    map.place_all_bytes();
+    let path = map.dijkstra().expect("no path found");
     let mut sol_map = map.map.same_shape(b'.');
     sol_map.data = map.map.data.iter().map(|clear| if *clear { b'.' } else { b'#' }).collect();
     for visited in &path {
@@ -88,7 +101,15 @@ pub fn part1_impl(input: &str, width: usize, height: usize, n: usize) -> usize {
 }
 
 pub fn part2_impl(input: &str, width: usize, height: usize) -> (i64, i64) {
-    (0,0)
+    let mut map = MemoryMap::from_str(input, width, height, None);
+
+    for byte in 0..map.byte_stream.len() {
+        map.place_byte(byte);
+        if map.dijkstra().is_none() {
+            return map.byte_stream[byte]
+        }
+    }
+    panic!("no bytes block route");
 }
 
 #[aoc(day18, part1)]
