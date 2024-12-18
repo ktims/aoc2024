@@ -285,6 +285,24 @@ impl Display for Grid<u8> {
     }
 }
 
+impl Display for Grid<bool> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for y in 0..self.height() {
+            for x in 0..self.width() {
+                f.write_fmt(format_args!(
+                    "{}",
+                    match *self.get(&(x as i64, y as i64)).unwrap() {
+                        true => '.',
+                        false => '#',
+                    }
+                ))?;
+            }
+            f.write_char('\n')?;
+        }
+        f.write_char('\n')
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
