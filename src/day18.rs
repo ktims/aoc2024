@@ -10,6 +10,7 @@ struct MemoryMap {
 }
 
 trait PathTrack {
+    const DOES_WORK: bool = true;
     fn new() -> Self;
     fn push(&mut self, pos: (i64, i64));
     fn finalize(&mut self) {}
@@ -37,6 +38,15 @@ impl PathTrack for Vec<(i64, i64)> {
     }
 }
 
+struct NoopTrack {}
+impl PathTrack for NoopTrack {
+    const DOES_WORK: bool = false;
+    fn new() -> Self {
+        Self {}
+    }
+    fn push(&mut self, _: (i64, i64)) {}
+}
+
 impl MemoryMap {
     fn from_str(input: &str, width: usize, height: usize) -> Self {
         let map = Grid::with_shape(width, height, true);
@@ -51,17 +61,14 @@ impl MemoryMap {
 
         Self { map, byte_stream }
     }
-    // Return if the byte caused a new blockage or not
-    fn place_byte(&mut self, i: usize) -> bool {
+
+    fn place_byte(&mut self, i: usize) {
         let pos = self.byte_stream[i];
-        match self.map.set(&pos, false) {
-            None => panic!("corruption outside memory bounds"),
-            Some(x) => x,
-        }
+        self.map.set(&pos, false);
     }
-    fn place_bytes(&mut self, n: usize) {
-        assert!(n < self.byte_stream.len());
-        for i in 0..n {
+
+    fn place_bytes(&mut self, start: usize, end: usize) {
+        for i in start..=end {
             self.place_byte(i);
         }
     }
@@ -85,16 +92,20 @@ impl MemoryMap {
 
         while let Some((cost, pos)) = queue.pop() {
             if pos == goal {
-                let mut visited_pos = goal;
-                let mut path = T::new();
-                path.push(pos);
-                while let Some(next) = prev.get(&visited_pos) {
-                    visited_pos = *next;
-                    path.push(*next);
-                    if *next == start {
-                        path.finalize();
-                        return Some(path);
+                if T::DOES_WORK {
+                    let mut visited_pos = goal;
+                    let mut path = T::new();
+                    path.push(pos);
+                    while let Some(next) = prev.get(&visited_pos) {
+                        visited_pos = *next;
+                        path.push(*next);
+                        if *next == start {
+                            path.finalize();
+                            return Some(path);
+                        }
                     }
+                } else {
+                    return Some(T::new());
                 }
             }
 
@@ -106,7 +117,9 @@ impl MemoryMap {
             for new_pos in moves {
                 if costs.get(&new_pos).is_none_or(|best_cost| cost.0 + 1 < *best_cost) {
                     costs.set(&new_pos, cost.0 + 1);
-                    prev.set(&new_pos, pos);
+                    if T::DOES_WORK {
+                        prev.set(&new_pos, pos);
+                    }
                     queue.push((Reverse(cost.0 + 1), new_pos));
                 }
             }
@@ -115,35 +128,54 @@ impl MemoryMap {
     }
 }
 
-pub fn part1_impl(input: &str, width: usize, height: usize, n: usize) -> usize {
+pub fn part1_impl(input: &str, width: usize, height: usize, initial_safe_byte_count: usize) -> usize {
     let mut map = MemoryMap::from_str(input, width, height);
-    map.place_bytes(n);
+    map.place_bytes(0, initial_safe_byte_count - 1);
     let path = map.dijkstra::<LengthPath>((0, 0)).expect("no path found");
 
     path.0 - 1 // count edges, not visited nodes (start doesn't count)
 }
 
-pub fn part2_impl(input: &str, width: usize, height: usize, n: usize) -> (i64, i64) {
+// My original devised solution
+pub fn part2_impl_brute(input: &str, width: usize, height: usize, initial_safe_byte_count: usize) -> (i64, i64) {
     let mut input_map = MemoryMap::from_str(input, width, height);
+    input_map.place_bytes(0, initial_safe_byte_count - 1);
 
-    input_map.place_bytes(n);
     let mut path = input_map.dijkstra::<Vec<(i64, i64)>>((0, 0)).expect("no path found");
 
-    for byte in n..input_map.byte_stream.len() {
-        if input_map.place_byte(byte) {
-            // If it's a new blockage, and it obstructs our best path, we need to do a new path search
-            if let Some((obs_at, _)) = path.iter().find_position(|v| *v == &input_map.byte_stream[byte]) {
-                let (before, _) = path.split_at(obs_at);
+    for byte in initial_safe_byte_count..input_map.byte_stream.len() {
+        input_map.place_byte(byte);
+        // If it obstructs our best path, we need to do a new path search
+        if let Some((obs_at, _)) = path.iter().find_position(|v| *v == &input_map.byte_stream[byte]) {
+            let (before, _) = path.split_at(obs_at);
 
-                if let Some(new_path) = input_map.dijkstra::<Vec<(i64, i64)>>(path[obs_at - 1]) {
-                    path = [before, &new_path].concat();
-                } else {
-                    return input_map.byte_stream[byte];
-                }
+            if let Some(new_path) = input_map.dijkstra::<Vec<(i64, i64)>>(path[obs_at - 1]) {
+                path = [before, &new_path].concat();
+            } else {
+                return input_map.byte_stream[byte];
             }
         }
     }
     panic!("no bytes block route");
+}
+
+// Optimized based on others' ideas
+pub fn part2_impl(input: &str, width: usize, height: usize, initial_safe_byte_count: usize) -> (i64, i64) {
+    let mut input_map = MemoryMap::from_str(input, width, height);
+
+    input_map.place_bytes(0, initial_safe_byte_count - 1);
+
+    // for the unplaced bytes, binary search for the partition point, given the predicate that a path is reachable
+    // when all bytes up to that n have been placed
+    let possible_problems = (initial_safe_byte_count..input_map.byte_stream.len()).collect_vec();
+    let solution = possible_problems.partition_point(|byte| {
+        // avoiding this clone by rolling back the byte placements instead is slower
+        let mut local_map = input_map.clone();
+        local_map.place_bytes(initial_safe_byte_count, *byte);
+        local_map.dijkstra::<NoopTrack>((0, 0)).is_some()
+    }) + initial_safe_byte_count;
+
+    return input_map.byte_stream[solution];
 }
 
 #[aoc(day18, part1)]
@@ -194,5 +226,10 @@ mod tests {
     #[test]
     fn part2_example() {
         assert_eq!(part2_impl(EXAMPLE, 7, 7, 12), (6, 1));
+    }
+
+    #[test]
+    fn part2_example_brute() {
+        assert_eq!(part2_impl_brute(EXAMPLE, 7, 7, 12,), (6, 1));
     }
 }
