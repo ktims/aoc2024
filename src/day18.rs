@@ -51,10 +51,12 @@ impl MemoryMap {
 
         Self { map, byte_stream }
     }
-    fn place_byte(&mut self, i: usize) {
+    // Return if the byte caused a new blockage or not
+    fn place_byte(&mut self, i: usize) -> bool {
         let pos = self.byte_stream[i];
-        if self.map.set(&pos, false).is_none() {
-            panic!("corruption outside memory bounds");
+        match self.map.set(&pos, false) {
+            None => panic!("corruption outside memory bounds"),
+            Some(x) => x,
         }
     }
     fn place_bytes(&mut self, n: usize) {
@@ -126,18 +128,18 @@ pub fn part2_impl(input: &str, width: usize, height: usize, n: usize) -> (i64, i
 
     input_map.place_bytes(n);
     let mut path = input_map.dijkstra::<Vec<(i64, i64)>>((0, 0)).expect("no path found");
-    println!("{:?}", path);
 
     for byte in n..input_map.byte_stream.len() {
-        input_map.place_byte(byte);
+        if input_map.place_byte(byte) {
+            // If it's a new blockage, and it obstructs our best path, we need to do a new path search
+            if let Some((obs_at, _)) = path.iter().find_position(|v| *v == &input_map.byte_stream[byte]) {
+                let (before, _) = path.split_at(obs_at);
 
-        if let Some((obs_at, _)) = path.iter().find_position(|v| *v == &input_map.byte_stream[byte]) {
-            let (before, _) = path.split_at(obs_at);
-
-            if let Some(new_path) = input_map.dijkstra::<Vec<(i64, i64)>>(path[obs_at - 1]) {
-                path = [before, &new_path].concat();
-            } else {
-                return input_map.byte_stream[byte];
+                if let Some(new_path) = input_map.dijkstra::<Vec<(i64, i64)>>(path[obs_at - 1]) {
+                    path = [before, &new_path].concat();
+                } else {
+                    return input_map.byte_stream[byte];
+                }
             }
         }
     }
