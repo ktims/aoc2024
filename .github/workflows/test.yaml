@@ -49,16 +49,14 @@ jobs:
 
     - name: cargo test
       run: cargo test --lib
-      continue-on-error: true
 
     - name: rustfmt
       run: cargo fmt --all -- --check
-      continue-on-error: true
 
     - name: clippy
       run: cargo clippy --lib --tests -- -D warnings
-      continue-on-error: true
+      if: always()
 
     - name: full run
       run: cargo run --release
-      continue-on-error: true
+      if: always()
