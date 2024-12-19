@@ -1,5 +1,6 @@
 use aoc_runner_derive::aoc;
 use itertools::Itertools;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rustc_hash::FxHashMap;
 use std::fmt::{Display, Write};
 
@@ -39,7 +40,7 @@ impl Display for Stripe {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Design {
     stripes: Vec<Stripe>,
 }
@@ -118,14 +119,16 @@ impl Onsen {
     }
     fn count_possible(&self) -> i64 {
         self.designs
-            .iter()
+            .clone()
+            .into_par_iter()
             .map(|d| self.possible(&d.stripes))
             .filter(|p| *p)
             .count() as i64
     }
     fn count_ways(&self) -> i64 {
         self.designs
-            .iter()
+            .clone()
+            .into_par_iter()
             .map(|d| self.ways(&d.stripes, FxHashMap::default()).1)
             .sum::<i64>()
     }
