@@ -1,11 +1,7 @@
 use aoc_runner_derive::aoc;
-use cached::proc_macro::cached;
 use itertools::Itertools;
-use rustc_hash::{FxHashMap, FxHasher};
-use std::{
-    collections::VecDeque,
-    fmt::{Display, Write},
-};
+use rustc_hash::FxHashMap;
+use std::fmt::{Display, Write};
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -30,9 +26,9 @@ impl From<&u8> for Stripe {
     }
 }
 
-impl Into<char> for &Stripe {
-    fn into(self) -> char {
-        let v = *self as u8;
+impl From<&Stripe> for char {
+    fn from(val: &Stripe) -> Self {
+        let v = *val as u8;
         v.into()
     }
 }
@@ -68,7 +64,6 @@ impl Display for Design {
 struct Onsen {
     towels: Vec<Design>,
     designs: Vec<Design>,
-    // ways_cache: FxHashMap<&'a [Stripe], i64>
 }
 
 impl Display for Onsen {
@@ -86,22 +81,23 @@ impl Display for Onsen {
 
 impl Onsen {
     fn possible(&self, d: &[Stripe]) -> bool {
-        if d.len() == 0 {
+        if d.is_empty() {
             return true;
         }
         for t in &self.towels {
-            if d.starts_with(&t.stripes) {
-                if self.possible(d.split_at(t.stripes.len()).1) {
-                    return true;
-                }
+            if d.starts_with(&t.stripes) && self.possible(d.split_at(t.stripes.len()).1) {
+                return true;
             }
         }
         false
     }
     // Count the ways to construct a given substring
-    fn ways<'a>(&'a self, d: &'a [Stripe], mut cache: FxHashMap<&'a [Stripe], i64>) -> (FxHashMap<&'a [Stripe], i64>, i64) {
-        if d.len() == 0 {
-            // println!("ways to make {} - 0", d.iter().join(""));
+    fn ways<'a>(
+        &'a self,
+        d: &'a [Stripe],
+        mut cache: FxHashMap<&'a [Stripe], i64>,
+    ) -> (FxHashMap<&'a [Stripe], i64>, i64) {
+        if d.is_empty() {
             return (cache, 1);
         }
         if cache.contains_key(d) {
@@ -117,7 +113,6 @@ impl Onsen {
                 count += res_count;
             }
         }
-        // println!("ways to make {} - {}", d.iter().join(""), count);
         cache.insert(d, count);
         (cache, count)
     }
@@ -129,7 +124,10 @@ impl Onsen {
             .count() as i64
     }
     fn count_ways(&self) -> i64 {
-        self.designs.iter().map(|d| self.ways(&d.stripes, FxHashMap::default()).1).sum::<i64>()
+        self.designs
+            .iter()
+            .map(|d| self.ways(&d.stripes, FxHashMap::default()).1)
+            .sum::<i64>()
     }
 }
 
@@ -143,6 +141,7 @@ fn parse(input: &str) -> Onsen {
         .filter(|s| !s.is_empty())
         .map(|s| s.as_bytes().into())
         .collect();
+
     lines.next().unwrap(); // discard empty line
 
     let designs = lines.map(|l| l.as_bytes().into()).collect();
@@ -177,9 +176,6 @@ ubwu
 bwurrg
 brgr
 bbrgwb";
-const EXAMPLE2: &str = "r, wr, b, g, bwu, rb, gb, br
-
-rrbgbr";
 
     #[test]
     fn part1_example() {
