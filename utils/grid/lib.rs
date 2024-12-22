@@ -39,6 +39,16 @@ impl<T: AsCoord2d> Add<T> for &Coord2d {
     }
 }
 
+impl<T: AsCoord2d> Add<&T> for Coord2d {
+    type Output = Coord2d;
+    fn add(self, rhs: &T) -> Self::Output {
+        Coord2d {
+            x: self.x() + rhs.x(),
+            y: self.y() + rhs.y(),
+        }
+    }
+}
+
 impl AsCoord2d for Coord2d {
     fn to_coord(self) -> Coord2d {
         self
@@ -64,6 +74,25 @@ impl AsCoord2d for &Coord2d {
 }
 
 impl<T> AsCoord2d for (T, T)
+where
+    T: Copy + TryInto<i64>,
+    <T as TryInto<i64>>::Error: Debug,
+{
+    fn to_coord(self) -> Coord2d {
+        Coord2d {
+            x: self.0.try_into().unwrap(),
+            y: self.1.try_into().unwrap(),
+        }
+    }
+    fn x(&self) -> i64 {
+        self.0.try_into().unwrap()
+    }
+    fn y(&self) -> i64 {
+        self.1.try_into().unwrap()
+    }
+}
+
+impl<T> AsCoord2d for &(T, T)
 where
     T: Copy + TryInto<i64>,
     <T as TryInto<i64>>::Error: Debug,
