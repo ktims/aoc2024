@@ -1,28 +1,31 @@
 use aoc_runner_derive::aoc;
 use itertools::Itertools;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rustc_hash::FxHashMap;
 
-#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Copy)]
 struct Change {
     price: i8,
     delta: i8,
 }
 
-fn evolve_secret(mut n: i64) -> i64 {
+type Secret = u64;
+
+fn evolve_secret(mut n: Secret) -> Secret {
     n = ((n * 64) ^ n) % 16777216;
     n = ((n / 32) ^ n) % 16777216;
     n = ((n * 2048) ^ n) % 16777216;
     n
 }
 
-fn rounds(mut secret: i64, n: i64) -> i64 {
+fn rounds(mut secret: Secret, n: Secret) -> Secret {
     for _ in 0..n {
         secret = evolve_secret(secret)
     }
     secret
 }
 
-fn prices(mut secret: i64, n: i64) -> Vec<i8> {
+fn prices(mut secret: Secret, n: usize) -> Vec<i8> {
     let mut prices = vec![(secret % 10) as i8];
     for _ in 1..n {
         secret = evolve_secret(secret);
@@ -31,60 +34,66 @@ fn prices(mut secret: i64, n: i64) -> Vec<i8> {
     prices
 }
 
-fn changes(prices: &[i8]) -> Vec<Change> {
-    prices
+fn build_profit_map(prices: &[i8]) -> FxHashMap<[i8; 4], i8> {
+    let mut profits = FxHashMap::default();
+    let changes = prices
         .windows(2)
         .map(|a| Change {
             price: a[1],
             delta: a[1] - a[0],
         })
-        .collect()
+        .collect_vec();
+    for i in 3..changes.len() {
+        let seq: [i8; 4] = changes[i - 3..=i]
+            .iter()
+            .map(|c| c.delta)
+            .collect_vec()
+            .try_into()
+            .unwrap();
+        profits.entry(seq).or_insert(changes[i].price);
+    }
+    profits
 }
 
-fn profit_for_sequence(changes: &Vec<Vec<Change>>, seq: &[i8]) -> i64 {
+fn profit_for_sequence(changes: &[FxHashMap<[i8; 4], i8>], seq: &[i8]) -> i64 {
     changes
-        .par_iter()
-        .filter_map(|inner| {
-            inner
-                .windows(seq.len())
-                .find(|window| window.iter().zip(seq).all(|(w, z)| w.delta == *z))
-                .map(|buy| buy[seq.len() - 1].price as i64)
-        })
+        .iter()
+        .filter_map(|inner| inner.get(seq).map(|v| *v as i64))
         .sum()
 }
 
-fn find_best_sequence(changes: &Vec<Vec<Change>>) -> [i8; 4] {
-    let mut best_seq = [0, 0, 0, 0];
-    let mut best_profit = 0;
-    for seq in (0..4).map(|_| (-9..=9i8)).multi_cartesian_product() {
-        let profit = profit_for_sequence(changes, &seq);
-        if profit > best_profit {
-            best_seq = seq.try_into().unwrap();
-            best_profit = profit;
-        }
-    }
-    best_seq
+fn find_best_sequence(changes: &[FxHashMap<[i8; 4], i8>]) -> [i8; 4] {
+    let possible_seqs = (0..4).map(|_| (-9..=9i8)).multi_cartesian_product().collect_vec();
+    let (best_seq, _best_profit) = possible_seqs
+        .par_iter()
+        .map_with(changes, |changes, seq| (seq, profit_for_sequence(changes, seq)))
+        .max_by(|(_, a), (_, b)| a.cmp(b))
+        .unwrap();
+
+    best_seq.as_slice().try_into().unwrap()
 }
 
-fn parse(input: &str) -> Vec<i64> {
+fn parse(input: &str) -> Vec<Secret> {
     input.lines().map(|l| l.parse().unwrap()).collect()
 }
 
 #[aoc(day22, part1)]
-pub fn part1(input: &str) -> i64 {
+pub fn part1(input: &str) -> Secret {
     let secrets = parse(input);
 
-    secrets.iter().map(|s| rounds(*s, 2000)).sum::<i64>()
+    secrets.iter().map(|s| rounds(*s, 2000)).sum::<Secret>()
 }
 
 #[aoc(day22, part2)]
 pub fn part2(input: &str) -> i64 {
     let secrets = parse(input);
 
-    let price_changes = secrets.iter().map(|s| changes(&prices(*s, 2000))).collect_vec();
+    let price_changes = secrets
+        .iter()
+        .map(|s| build_profit_map(&prices(*s, 2000)))
+        .collect_vec();
 
     let seq = find_best_sequence(&price_changes);
-    println!("found best seq: {:?}", seq);
     profit_for_sequence(&price_changes, &seq)
 }
 
@@ -122,26 +131,16 @@ mod tests {
     #[test]
     fn test_profit() {
         assert_eq!(
-            profit_for_sequence(&vec![changes(&prices(123, 10))], &[-1, -1, 0, 2]),
+            profit_for_sequence(&vec![build_profit_map(&prices(123, 10))], &[-1, -1, 0, 2]),
             6
         );
         let secrets = parse(EXAMPLE2);
 
-        let price_changes = secrets.iter().map(|s| changes(&prices(*s, 2000))).collect_vec();
+        let price_changes = secrets
+            .iter()
+            .map(|s| build_profit_map(&prices(*s, 2000)))
+            .collect_vec();
         assert_eq!(profit_for_sequence(&price_changes, &[-2, 1, -1, 3]), 23);
-    }
-
-    #[test]
-    fn test_changes() {
-        let changes = changes(&prices(123, 10));
-        assert_eq!(
-            changes.iter().map(|c| c.delta).collect_vec(),
-            vec![-3, 6, -1, -1, 0, 2, -2, 0, -2]
-        );
-        assert_eq!(
-            changes.iter().map(|c| c.price).collect_vec(),
-            vec![0, 6, 5, 4, 4, 6, 4, 4, 2]
-        );
     }
 
     #[test]
