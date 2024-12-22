@@ -1,18 +1,7 @@
-use std::{
-    cmp::Reverse,
-    collections::{BinaryHeap, VecDeque},
-};
+use std::collections::VecDeque;
 
 use aoc_runner_derive::aoc;
 use grid::Grid;
-use rustc_hash::{FxHashMap, FxHashSet};
-
-trait PathTrack {
-    const DOES_WORK: bool = true;
-    fn new() -> Self;
-    fn push(&mut self, pos: (i64, i64));
-    fn finalize(&mut self) {}
-}
 
 struct RaceTrack {
     map: Grid<u8>,
@@ -21,7 +10,7 @@ struct RaceTrack {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 struct State {
     pos: (i64, i64),
-    cost: usize,
+    cost: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -50,15 +39,12 @@ impl RaceTrack {
                 _ => None,
             })
     }
-    fn path_costs(&self, start: (i64, i64), goal: (i64, i64)) -> (Vec<(i64, i64)>, Grid<Option<usize>>) {
+    fn path_costs(&self, start: (i64, i64), goal: (i64, i64)) -> (Vec<(i64, i64)>, Grid<Option<u64>>) {
         let mut queue = VecDeque::new();
         let mut visited = self.map.same_shape(None);
 
         let start_state = CheatState {
-            s: State {
-                pos: start,
-                cost: 0usize,
-            },
+            s: State { pos: start, cost: 0 },
             p: Vec::new(),
         };
         visited.set(&start, Some(0));
@@ -86,9 +72,9 @@ impl RaceTrack {
     fn find_cheats(
         &self,
         path: &Vec<(i64, i64)>,
-        costs: &Grid<Option<usize>>,
-        min: usize,
-    ) -> Vec<((i64, i64), (i64, i64), usize)> {
+        costs: &Grid<Option<u64>>,
+        min: u64,
+    ) -> Vec<((i64, i64), (i64, i64), u64)> {
         let mut cheats = Vec::new();
         for pos in path {
             let local_cost = costs.get(pos).unwrap().unwrap();
@@ -107,6 +93,47 @@ impl RaceTrack {
         }
         cheats
     }
+
+    fn taxi_dist(&self, from: &(i64, i64), to: &(i64, i64)) -> Option<u64> {
+        if self.map.is_valid(to) {
+            Some(from.0.abs_diff(to.0) + from.1.abs_diff(to.1))
+        } else {
+            None
+        }
+    }
+
+    fn find_cheats_n(
+        &self,
+        path: &Vec<(i64, i64)>,
+        costs: &Grid<Option<u64>>,
+        max_length: u64,
+        min: u64,
+    ) -> Vec<((i64, i64), (i64, i64))> {
+        let mut cheats = Vec::new();
+        let mut solutions = self.map.clone();
+
+        for pos in path {
+            let from_cost = costs.get(pos).unwrap().unwrap();
+            for x in 0..self.map.width() as i64 {
+                for y in 0..self.map.height() as i64 {
+                    if let Some(dist) = self.taxi_dist(pos, &(x, y)) {
+                        if dist <= max_length && dist >= 2 {
+                            if let Some(to_cost) = costs.get(&(x, y)).unwrap() {
+                                solutions.set(pos, b'O');
+                                solutions.set(&(x, y), b'O');
+                                if *to_cost > (from_cost + dist) && (to_cost - (from_cost + dist) >= min) {
+                                    cheats.push((*pos, (x, y)));
+                                }
+                            }
+                        }
+                    }
+                    solutions.set(&(x, y), *self.map.get(&(x, y)).unwrap());
+                }
+            }
+            solutions.set(pos, *self.map.get(pos).unwrap());
+        }
+        cheats
+    }
 }
 
 fn parse(input: &str) -> RaceTrack {
@@ -114,12 +141,22 @@ fn parse(input: &str) -> RaceTrack {
     RaceTrack { map }
 }
 
-fn part1_impl(input: &str, cheat_min: usize) -> i64 {
+fn part1_impl(input: &str, cheat_min: u64) -> i64 {
     let track = parse(input);
     let start = track.map.find(&b'S').unwrap();
     let goal = track.map.find(&b'E').unwrap();
     let (best_path, costs) = track.path_costs(start.into(), goal.into());
     let cheats = track.find_cheats(&best_path, &costs, cheat_min);
+
+    cheats.len() as i64
+}
+
+fn part2_impl(input: &str, max_length: u64, cheat_min: u64) -> i64 {
+    let track = parse(input);
+    let start = track.map.find(&b'S').unwrap();
+    let goal = track.map.find(&b'E').unwrap();
+    let (best_path, costs) = track.path_costs(start.into(), goal.into());
+    let cheats = track.find_cheats_n(&best_path, &costs, max_length, cheat_min);
 
     cheats.len() as i64
 }
@@ -131,7 +168,7 @@ pub fn part1(input: &str) -> i64 {
 
 #[aoc(day20, part2)]
 pub fn part2(input: &str) -> i64 {
-    todo!()
+    part2_impl(input, 20, 100)
 }
 
 #[cfg(test)]
@@ -160,6 +197,7 @@ mod tests {
 
     #[test]
     fn part2_example() {
-        assert_eq!(part2(EXAMPLE), 0);
+        assert_eq!(part2_impl(EXAMPLE, 2, 0), 44);
+        assert_eq!(part2_impl(EXAMPLE, 20, 50), 285);
     }
 }
