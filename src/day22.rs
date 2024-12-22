@@ -1,4 +1,4 @@
-use aoc_runner_derive::{aoc, aoc_generator};
+use aoc_runner_derive::aoc;
 use itertools::Itertools;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -31,7 +31,7 @@ fn prices(mut secret: i64, n: i64) -> Vec<i8> {
     prices
 }
 
-fn changes(prices: &Vec<i8>) -> Vec<Change> {
+fn changes(prices: &[i8]) -> Vec<Change> {
     prices
         .windows(2)
         .map(|a| Change {
@@ -45,14 +45,10 @@ fn profit_for_sequence(changes: &Vec<Vec<Change>>, seq: &[i8]) -> i64 {
     changes
         .par_iter()
         .filter_map(|inner| {
-            if let Some(buy) = inner
+            inner
                 .windows(seq.len())
                 .find(|window| window.iter().zip(seq).all(|(w, z)| w.delta == *z))
-            {
-                Some(buy[seq.len() - 1].price as i64)
-            } else {
-                None
-            }
+                .map(|buy| buy[seq.len() - 1].price as i64)
         })
         .sum()
 }
@@ -60,7 +56,7 @@ fn profit_for_sequence(changes: &Vec<Vec<Change>>, seq: &[i8]) -> i64 {
 fn find_best_sequence(changes: &Vec<Vec<Change>>) -> [i8; 4] {
     let mut best_seq = [0, 0, 0, 0];
     let mut best_profit = 0;
-    for seq in (0..4).map(|_| (-9..=9 as i8)).multi_cartesian_product() {
+    for seq in (0..4).map(|_| (-9..=9i8)).multi_cartesian_product() {
         let profit = profit_for_sequence(changes, &seq);
         if profit > best_profit {
             best_seq = seq.try_into().unwrap();
@@ -75,14 +71,14 @@ fn parse(input: &str) -> Vec<i64> {
 }
 
 #[aoc(day22, part1)]
-fn part1(input: &str) -> i64 {
+pub fn part1(input: &str) -> i64 {
     let secrets = parse(input);
 
     secrets.iter().map(|s| rounds(*s, 2000)).sum::<i64>()
 }
 
 #[aoc(day22, part2)]
-fn part2(input: &str) -> i64 {
+pub fn part2(input: &str) -> i64 {
     let secrets = parse(input);
 
     let price_changes = secrets.iter().map(|s| changes(&prices(*s, 2000))).collect_vec();
@@ -132,10 +128,7 @@ mod tests {
         let secrets = parse(EXAMPLE2);
 
         let price_changes = secrets.iter().map(|s| changes(&prices(*s, 2000))).collect_vec();
-        assert_eq!(
-            profit_for_sequence(&price_changes, &[-2, 1, -1, 3]),
-            23
-        );
+        assert_eq!(profit_for_sequence(&price_changes, &[-2, 1, -1, 3]), 23);
     }
 
     #[test]
