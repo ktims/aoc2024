@@ -82,6 +82,12 @@ where
     }
 }
 
+impl From<Coord2d> for (i64, i64) {
+    fn from(value: Coord2d) -> Self {
+        (value.x, value.y)
+    }
+}
+
 #[derive(Debug)]
 pub struct GridRowIter<'a, T> {
     iter: std::slice::Iter<'a, T>,
@@ -164,12 +170,27 @@ impl<T: Clone + Eq + PartialEq + Debug> Grid<T> {
     pub fn pos<C: AsCoord2d>(&self, c: &C) -> i64 {
         c.y() * self.width + c.x()
     }
-    pub fn coord(&self, pos: i64) -> Option<(i64, i64)> {
+    pub fn coord(&self, pos: i64) -> Option<Coord2d> {
         if pos < 0 || pos >= self.data.len() as i64 {
             None
         } else {
-            Some((pos % self.width, pos / self.width))
+            Some(Coord2d {
+                x: pos % self.width,
+                y: pos / self.width,
+            })
         }
+    }
+    // pub fn coord_iter(&self) -> CoordIter<_> {
+    //     CoordIter { pos: 0, grid: self }
+    // }
+    pub fn is_valid<C: AsCoord2d>(&self, c: &C) -> bool {
+        if c.x() < 0 || c.x() >= self.width {
+            return false;
+        }
+        if c.y() < 0 || c.y() as usize >= self.height() {
+            return false;
+        }
+        return true;
     }
     fn valid_pos<C: AsCoord2d>(&self, c: &C) -> Option<usize> {
         if c.x() < 0 || c.x() >= self.width {
@@ -249,7 +270,7 @@ impl<T: Clone + Eq + PartialEq + Debug> Grid<T> {
         }
     }
 
-    pub fn find(&self, haystack: &T) -> Option<(i64, i64)> {
+    pub fn find(&self, haystack: &T) -> Option<Coord2d> {
         self.coord(
             self.data
                 .iter()

@@ -25,7 +25,7 @@ impl TrailMap {
             .iter()
             .enumerate()
             .filter(|(_, v)| **v == b'0')
-            .map(|(i, _v)| self.map.coord(i as i64).unwrap())
+            .map(|(i, _v)| self.map.coord(i as i64).unwrap().into())
             .collect_vec()
     }
     fn count_reachable_from(&self, pos: &(i64, i64), needle: u8, visited: &mut Grid<bool>) -> u64 {

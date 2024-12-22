@@ -104,7 +104,7 @@ impl<T: BufRead> From<T> for Map {
         let guard_facing = FacingDirection::Up;
         Self {
             grid,
-            guard_pos,
+            guard_pos: guard_pos.into(),
             guard_facing,
             visited_from,
             path: Vec::new(),

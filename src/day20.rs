@@ -118,7 +118,7 @@ fn part1_impl(input: &str, cheat_min: usize) -> i64 {
     let track = parse(input);
     let start = track.map.find(&b'S').unwrap();
     let goal = track.map.find(&b'E').unwrap();
-    let (best_path, costs) = track.path_costs(start, goal);
+    let (best_path, costs) = track.path_costs(start.into(), goal.into());
     let cheats = track.find_cheats(&best_path, &costs, cheat_min);
 
     cheats.len() as i64

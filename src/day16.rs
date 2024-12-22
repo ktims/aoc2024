@@ -1,5 +1,5 @@
 use aoc_runner_derive::aoc;
-use grid::Grid;
+use grid::{Coord2d, Grid};
 use std::{
     cmp::Ordering,
     collections::{BinaryHeap, HashMap},
@@ -108,10 +108,10 @@ impl Maze {
             })
     }
     fn dijkstra(&self) -> usize {
-        let (start_x, start_y) = self.map.find(&b'S').expect("can't find start");
+        let Coord2d {x: start_x, y: start_y} = self.map.find(&b'S').expect("can't find start");
         let start = (start_x as CoordType, start_y as CoordType);
 
-        let (finish_x, finish_y) = self.map.find(&b'E').expect("can't find finish");
+        let Coord2d {x: finish_x, y: finish_y} = self.map.find(&b'E').expect("can't find finish");
         let finish = (finish_x as CoordType, finish_y as CoordType);
 
         let mut distances = HashMap::new();
@@ -149,10 +149,11 @@ impl Maze {
         usize::MAX
     }
     fn path_dijkstra(&mut self) -> (usize, Vec<Vec<Coord>>) {
-        let (start_x, start_y) = self.map.find(&b'S').expect("can't find start");
-        let start = (start_x.try_into().unwrap(), start_y.try_into().unwrap());
-        let (finish_x, finish_y) = self.map.find(&b'E').expect("can't find finish");
-        let finish = (finish_x.try_into().unwrap(), finish_y.try_into().unwrap());
+        let Coord2d {x: start_x, y: start_y} = self.map.find(&b'S').expect("can't find start");
+        let start = (start_x as CoordType, start_y as CoordType);
+
+        let Coord2d {x: finish_x, y: finish_y} = self.map.find(&b'E').expect("can't find finish");
+        let finish = (finish_x as CoordType, finish_y as CoordType);
 
         let mut distances = HashMap::new();
         let mut queue = BinaryHeap::with_capacity(self.map.data.len());
