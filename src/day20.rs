@@ -1,7 +1,8 @@
-use std::collections::VecDeque;
-
 use aoc_runner_derive::aoc;
-use grid::Grid;
+use grid::{AsCoord2d, Coord2d, Grid};
+use itertools::Itertools;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use std::collections::VecDeque;
 
 struct RaceTrack {
     map: Grid<u8>,
@@ -9,28 +10,24 @@ struct RaceTrack {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 struct State {
-    pos: (i64, i64),
+    pos: Coord2d,
     cost: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 struct CheatState {
     s: State,
-    p: Vec<(i64, i64)>,
 }
 
 const DIRECTIONS: [(i64, i64); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
 
 impl RaceTrack {
-    fn valid_moves<'a>(&'a self, CheatState { s: state, p }: &'a CheatState) -> impl Iterator<Item = CheatState> + 'a {
-        let mut new_path = p.clone();
-        new_path.push(state.pos);
+    fn valid_moves<'a>(&'a self, CheatState { s: state }: &'a CheatState) -> impl Iterator<Item = CheatState> + 'a {
         DIRECTIONS
             .iter()
-            .map(|dir| (state.pos.0 + dir.0, state.pos.1 + dir.1))
+            .map(|dir| state.pos + dir)
             .filter_map(move |pos| match &self.map.get(&pos) {
                 Some(b'.') | Some(b'S') | Some(b'E') => Some(CheatState {
-                    p: new_path.clone(),
                     s: State {
                         pos,
                         cost: state.cost + 1,
@@ -39,22 +36,19 @@ impl RaceTrack {
                 _ => None,
             })
     }
-    fn path_costs(&self, start: (i64, i64), goal: (i64, i64)) -> (Vec<(i64, i64)>, Grid<Option<u64>>) {
+    fn path_costs(&self, start: Coord2d, goal: Coord2d) -> Grid<Option<u64>> {
         let mut queue = VecDeque::new();
         let mut visited = self.map.same_shape(None);
 
         let start_state = CheatState {
             s: State { pos: start, cost: 0 },
-            p: Vec::new(),
         };
         visited.set(&start, Some(0));
         queue.push_back(start_state);
 
         while let Some(state) = queue.pop_front() {
             if state.s.pos == goal {
-                let mut final_path = state.p;
-                final_path.push(goal);
-                return (final_path, visited);
+                return visited;
             }
 
             let moves = self.valid_moves(&state);
@@ -69,70 +63,49 @@ impl RaceTrack {
         panic!("no path");
     }
 
-    fn find_cheats(
-        &self,
-        path: &Vec<(i64, i64)>,
-        costs: &Grid<Option<u64>>,
-        min: u64,
-    ) -> Vec<((i64, i64), (i64, i64), u64)> {
-        let mut cheats = Vec::new();
+    fn find_cheats(&self, path: &Vec<Coord2d>, costs: &Grid<Option<u64>>, min: u64) -> i64 {
+        let mut n = 0;
         for pos in path {
             let local_cost = costs.get(pos).unwrap().unwrap();
             for ofs in DIRECTIONS {
-                let cheat_start = (pos.0 + ofs.0, pos.1 + ofs.1);
-                let cheat_exit = (pos.0 + ofs.0 * 2, pos.1 + ofs.1 * 2);
+                let cheat_exit = (pos.x() + ofs.0 * 2, pos.y() + ofs.1 * 2);
                 if let Some(Some(cheat_cost)) = costs.get(&cheat_exit) {
                     if *cheat_cost > local_cost + 2 {
                         let cheat_savings = cheat_cost - local_cost - 2;
                         if cheat_savings >= min {
-                            cheats.push((cheat_start, cheat_exit, cheat_savings));
+                            n += 1;
                         }
                     }
                 }
             }
         }
-        cheats
+        n
     }
 
-    fn taxi_dist(&self, from: &(i64, i64), to: &(i64, i64)) -> Option<u64> {
-        if self.map.is_valid(to) {
-            Some(from.0.abs_diff(to.0) + from.1.abs_diff(to.1))
-        } else {
-            None
-        }
+    fn taxi_dist<A: AsCoord2d, B: AsCoord2d>(from: &A, to: &B) -> u64 {
+        from.x().abs_diff(to.x()) + from.y().abs_diff(to.y())
     }
 
-    fn find_cheats_n(
-        &self,
-        path: &Vec<(i64, i64)>,
-        costs: &Grid<Option<u64>>,
-        max_length: u64,
-        min: u64,
-    ) -> Vec<((i64, i64), (i64, i64))> {
-        let mut cheats = Vec::new();
-        let mut solutions = self.map.clone();
-
-        for pos in path {
-            let from_cost = costs.get(pos).unwrap().unwrap();
-            for x in 0..self.map.width() as i64 {
-                for y in 0..self.map.height() as i64 {
-                    if let Some(dist) = self.taxi_dist(pos, &(x, y)) {
+    fn find_cheats_n(&self, path: &Vec<Coord2d>, costs: &Grid<Option<u64>>, max_length: u64, min: u64) -> i64 {
+        path.par_iter()
+            .map_with(costs, |costs, pos| {
+                let from_cost = costs.get(pos).unwrap().unwrap();
+                let mut n = 0;
+                for x in pos.x - max_length as i64 - 1..=pos.x + max_length as i64 {
+                    for y in pos.y - max_length as i64 - 1..=pos.y + max_length as i64 {
+                        let dist = Self::taxi_dist(pos, &(x, y));
                         if dist <= max_length && dist >= 2 {
-                            if let Some(to_cost) = costs.get(&(x, y)).unwrap() {
-                                solutions.set(pos, b'O');
-                                solutions.set(&(x, y), b'O');
+                            if let Some(Some(to_cost)) = costs.get(&(x, y)) {
                                 if *to_cost > (from_cost + dist) && (to_cost - (from_cost + dist) >= min) {
-                                    cheats.push((*pos, (x, y)));
+                                    n += 1;
                                 }
                             }
                         }
                     }
-                    solutions.set(&(x, y), *self.map.get(&(x, y)).unwrap());
                 }
-            }
-            solutions.set(pos, *self.map.get(pos).unwrap());
-        }
-        cheats
+                n
+            })
+            .sum()
     }
 }
 
@@ -145,20 +118,30 @@ fn part1_impl(input: &str, cheat_min: u64) -> i64 {
     let track = parse(input);
     let start = track.map.find(&b'S').unwrap();
     let goal = track.map.find(&b'E').unwrap();
-    let (best_path, costs) = track.path_costs(start.into(), goal.into());
-    let cheats = track.find_cheats(&best_path, &costs, cheat_min);
-
-    cheats.len() as i64
+    let costs = track.path_costs(start, goal);
+    let path_squares = costs
+        .data
+        .iter()
+        .enumerate()
+        .filter(|(_i, c)| c.is_some())
+        .filter_map(|(i, _)| track.map.coord(i as i64))
+        .collect_vec();
+    track.find_cheats(&path_squares, &costs, cheat_min)
 }
 
 fn part2_impl(input: &str, max_length: u64, cheat_min: u64) -> i64 {
     let track = parse(input);
     let start = track.map.find(&b'S').unwrap();
     let goal = track.map.find(&b'E').unwrap();
-    let (best_path, costs) = track.path_costs(start.into(), goal.into());
-    let cheats = track.find_cheats_n(&best_path, &costs, max_length, cheat_min);
-
-    cheats.len() as i64
+    let costs = track.path_costs(start, goal);
+    let path_squares = costs
+        .data
+        .iter()
+        .enumerate()
+        .filter(|(_i, c)| c.is_some())
+        .filter_map(|(i, _)| track.map.coord(i as i64))
+        .collect_vec();
+    track.find_cheats_n(&path_squares, &costs, max_length, cheat_min)
 }
 
 #[aoc(day20, part1)]
