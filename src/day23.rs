@@ -71,12 +71,12 @@ impl Network {
             let mut new_r = r.clone();
             new_r.insert(*node);
 
-            let neighbours = FxHashSet::from_iter(self.edges.get(&node).unwrap().iter().map(|n| *n));
-            let new_p = FxHashSet::from_iter(p.intersection(&neighbours).map(|n| *n));
-            let new_x = FxHashSet::from_iter(x.intersection(&neighbours).map(|n| *n));
+            let neighbours = FxHashSet::from_iter(self.edges.get(node).unwrap().iter().copied());
+            let new_p = FxHashSet::from_iter(p.intersection(&neighbours).copied());
+            let new_x = FxHashSet::from_iter(x.intersection(&neighbours).copied());
 
             results.extend(self.bron_kerbosch(new_r, new_p, new_x).into_iter());
-            p.remove(&node);
+            p.remove(node);
             x.insert(*node);
         }
         results
@@ -84,7 +84,7 @@ impl Network {
     fn maximal_subgraphs(&self) -> Vec<FxHashSet<Node>> {
         self.bron_kerbosch(
             FxHashSet::default(),
-            FxHashSet::from_iter(self.nodes.iter().map(|n| *n)),
+            FxHashSet::from_iter(self.nodes.iter().copied()),
             FxHashSet::default(),
         )
     }
