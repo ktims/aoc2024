@@ -1,13 +1,24 @@
-use std::fmt::Debug;
+use std::{
+    collections::VecDeque,
+    fmt::{Debug, Display},
+};
 
 use aoc_runner_derive::aoc;
+use indicatif::{ParallelProgressIterator, ProgressBar, ProgressIterator};
 use itertools::Itertools;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 struct Node([char; 2]);
 
 impl Debug for Node {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}", self.0.iter().join("")))
+    }
+}
+
+impl Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("{}", self.0.iter().join("")))
     }
@@ -51,6 +62,44 @@ impl Network {
         }
         sets
     }
+    fn node_groups(&self, n: &Node, adjacent_set: FxHashSet<Node>) -> Option<FxHashSet<Node>> {
+        // println!("{:?} {:?}", n, adjacent_set);
+        let neigh = FxHashSet::from_iter(self.edges.get(n).unwrap().iter().map(|n| *n));
+        let intersection = FxHashSet::from_iter(adjacent_set.intersection(&neigh).map(|n| *n));
+        if intersection != adjacent_set {
+            return Some(adjacent_set);
+        }
+        let mut next_adj_set = adjacent_set.clone();
+        next_adj_set.insert(*n);
+        neigh
+            .iter()
+            .filter(|neigh_n| !next_adj_set.contains(neigh_n))
+            .filter_map(|neigh_n| self.node_groups(neigh_n, next_adj_set.clone()))
+            .max_by(|a, b| a.len().cmp(&b.len()))
+    }
+    fn born_kerbosch(&self, r: FxHashSet<Node>, mut p: FxHashSet<Node>, mut x: FxHashSet<Node>) -> FxHashSet<Node> {
+        if p.is_empty() && r.is_empty() {
+            return r;
+        }
+        let p_iter = p.clone(); // se we can modify p
+        for node in &p_iter {
+            let mut new_r = r.clone();
+            new_r.insert(*node);
+            let new_p = FxHashSet::from_iter(
+                p.intersection(&FxHashSet::from_iter(self.edges.get(&node).unwrap().iter().map(|n| *n)))
+                    .map(|n| *n),
+            );
+            let new_x = FxHashSet::from_iter(
+                x.intersection(&FxHashSet::from_iter(self.edges.get(&node).unwrap().iter().map(|n| *n)))
+                    .map(|n| *n),
+            );
+
+            self.born_kerbosch(new_r, new_p, new_x);
+            p.remove(&node);
+            x.insert(*node);
+        }
+        r
+    }
 }
 
 impl From<&str> for Network {
@@ -83,17 +132,37 @@ fn parse(input: &str) -> Network {
 #[aoc(day23, part1)]
 pub fn part1(input: &str) -> i64 {
     let network = parse(input);
-    println!("edges: {:?}", network.edges);
+    // println!("edges: {:?}", network.edges);
     let sets = network.groups_3();
     let t_count = sets.iter().filter(|set| set.iter().any(|s| s.0[0] == 't')).count();
-    println!("groups: {:?}", sets);
-    
+    // println!("groups: {:?}", sets);
+
     t_count as i64
 }
 
 #[aoc(day23, part2)]
 pub fn part2(input: &str) -> String {
-    todo!()
+    let network = parse(input);
+    let mut best = FxHashSet::default();
+    let mut node_queue = network.nodes.clone();
+    let progress = ProgressBar::new(network.nodes.len() as u64);
+    while let Some(node) = node_queue.pop() {
+        progress.inc(1);
+        let net = network.node_groups(&node, FxHashSet::default()).unwrap();
+        println!("NODE {} best: {:?}", node, net);
+        for checked in &net {
+            if let Some(idx) = node_queue.iter().position(|to_remove| to_remove == checked) {
+                node_queue.remove(idx);
+                progress.inc(1);
+            }
+        }
+        if net.len() > best.len() {
+            best = net;
+        }
+    }
+    // println!("{:?}", network.node_groups(&Node(['k', 'a']), FxHashSet::default()));
+    println!("best: {:?}", best);
+    String::new()
 }
 
 #[cfg(test)]
