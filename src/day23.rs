@@ -1,13 +1,7 @@
-use std::{
-    collections::VecDeque,
-    fmt::{Debug, Display},
-};
-
 use aoc_runner_derive::aoc;
-use indicatif::{ParallelProgressIterator, ProgressBar, ProgressIterator};
 use itertools::Itertools;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::fmt::{Debug, Display};
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 struct Node([char; 2]);
@@ -62,43 +56,37 @@ impl Network {
         }
         sets
     }
-    fn node_groups(&self, n: &Node, adjacent_set: FxHashSet<Node>) -> Option<FxHashSet<Node>> {
-        // println!("{:?} {:?}", n, adjacent_set);
-        let neigh = FxHashSet::from_iter(self.edges.get(n).unwrap().iter().map(|n| *n));
-        let intersection = FxHashSet::from_iter(adjacent_set.intersection(&neigh).map(|n| *n));
-        if intersection != adjacent_set {
-            return Some(adjacent_set);
+    fn bron_kerbosch(
+        &self,
+        r: FxHashSet<Node>,
+        mut p: FxHashSet<Node>,
+        mut x: FxHashSet<Node>,
+    ) -> Vec<FxHashSet<Node>> {
+        let mut results = Vec::new();
+        if p.is_empty() && x.is_empty() {
+            return vec![r];
         }
-        let mut next_adj_set = adjacent_set.clone();
-        next_adj_set.insert(*n);
-        neigh
-            .iter()
-            .filter(|neigh_n| !next_adj_set.contains(neigh_n))
-            .filter_map(|neigh_n| self.node_groups(neigh_n, next_adj_set.clone()))
-            .max_by(|a, b| a.len().cmp(&b.len()))
-    }
-    fn born_kerbosch(&self, r: FxHashSet<Node>, mut p: FxHashSet<Node>, mut x: FxHashSet<Node>) -> FxHashSet<Node> {
-        if p.is_empty() && r.is_empty() {
-            return r;
-        }
-        let p_iter = p.clone(); // se we can modify p
+        let p_iter = p.clone(); // so we can modify p
         for node in &p_iter {
             let mut new_r = r.clone();
             new_r.insert(*node);
-            let new_p = FxHashSet::from_iter(
-                p.intersection(&FxHashSet::from_iter(self.edges.get(&node).unwrap().iter().map(|n| *n)))
-                    .map(|n| *n),
-            );
-            let new_x = FxHashSet::from_iter(
-                x.intersection(&FxHashSet::from_iter(self.edges.get(&node).unwrap().iter().map(|n| *n)))
-                    .map(|n| *n),
-            );
 
-            self.born_kerbosch(new_r, new_p, new_x);
+            let neighbours = FxHashSet::from_iter(self.edges.get(&node).unwrap().iter().map(|n| *n));
+            let new_p = FxHashSet::from_iter(p.intersection(&neighbours).map(|n| *n));
+            let new_x = FxHashSet::from_iter(x.intersection(&neighbours).map(|n| *n));
+
+            results.extend(self.bron_kerbosch(new_r, new_p, new_x).into_iter());
             p.remove(&node);
             x.insert(*node);
         }
-        r
+        results
+    }
+    fn maximal_subgraphs(&self) -> Vec<FxHashSet<Node>> {
+        self.bron_kerbosch(
+            FxHashSet::default(),
+            FxHashSet::from_iter(self.nodes.iter().map(|n| *n)),
+            FxHashSet::default(),
+        )
     }
 }
 
@@ -143,26 +131,12 @@ pub fn part1(input: &str) -> i64 {
 #[aoc(day23, part2)]
 pub fn part2(input: &str) -> String {
     let network = parse(input);
-    let mut best = FxHashSet::default();
-    let mut node_queue = network.nodes.clone();
-    let progress = ProgressBar::new(network.nodes.len() as u64);
-    while let Some(node) = node_queue.pop() {
-        progress.inc(1);
-        let net = network.node_groups(&node, FxHashSet::default()).unwrap();
-        println!("NODE {} best: {:?}", node, net);
-        for checked in &net {
-            if let Some(idx) = node_queue.iter().position(|to_remove| to_remove == checked) {
-                node_queue.remove(idx);
-                progress.inc(1);
-            }
-        }
-        if net.len() > best.len() {
-            best = net;
-        }
-    }
-    // println!("{:?}", network.node_groups(&Node(['k', 'a']), FxHashSet::default()));
-    println!("best: {:?}", best);
-    String::new()
+    let best_sets = network.maximal_subgraphs();
+    let largest_set = best_sets.iter().max_by(|a, b| a.len().cmp(&b.len())).unwrap();
+    let mut largest = largest_set.iter().collect_vec();
+    largest.sort();
+    println!("best: {:?}", largest);
+    largest.iter().join(",")
 }
 
 #[cfg(test)]
