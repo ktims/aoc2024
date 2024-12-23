@@ -20,7 +20,7 @@ impl Display for Node {
 
 impl From<[char; 2]> for Node {
     fn from(value: [char; 2]) -> Self {
-        Node(value)
+        Self(value)
     }
 }
 
@@ -33,8 +33,8 @@ impl TryFrom<Vec<char>> for Node {
 }
 
 struct Network {
-    nodes: Vec<Node>,
-    edges: FxHashMap<Node, Vec<Node>>,
+    nodes: FxHashSet<Node>,
+    edges: FxHashMap<Node, FxHashSet<Node>>,
 }
 
 impl Network {
@@ -56,6 +56,8 @@ impl Network {
         }
         sets
     }
+    // Had to study Wikipedia for this one
+    // https://en.wikipedia.org/wiki/Bron%E2%80%93Kerbosch_algorithm
     fn bron_kerbosch(
         &self,
         r: FxHashSet<Node>,
@@ -65,8 +67,15 @@ impl Network {
         let mut results = Vec::new();
         if p.is_empty() && x.is_empty() {
             return vec![r];
+        } else if p.is_empty() {
+            return Vec::new();
         }
-        let p_iter = p.clone(); // so we can modify p
+        // choose the pivot with the most neighbours, to minimize the size of p_iter
+        let p_iter = if let Some(pivot) = p.union(&x).max_by(|a, b| self.edges[a].len().cmp(&self.edges[b].len())) {
+            FxHashSet::from_iter(p.difference(self.edges.get(pivot).unwrap()).copied())
+        } else {
+            p.clone()
+        };
         for node in &p_iter {
             let mut new_r = r.clone();
             new_r.insert(*node);
@@ -92,7 +101,7 @@ impl Network {
 
 impl From<&str> for Network {
     fn from(input: &str) -> Self {
-        let mut nodes = Vec::new();
+        let mut nodes = FxHashSet::default();
         let mut edges = FxHashMap::default();
         for line in input.lines() {
             let (node1, node2) = line.split_once('-').unwrap();
@@ -101,13 +110,13 @@ impl From<&str> for Network {
                 node2.chars().collect_vec().try_into().unwrap(),
             );
             if !nodes.contains(&node1) {
-                nodes.push(node1);
+                nodes.insert(node1);
             }
             if !nodes.contains(&node2) {
-                nodes.push(node2);
+                nodes.insert(node2);
             }
-            edges.entry(node1).or_insert(Vec::new()).push(node2);
-            edges.entry(node2).or_insert(Vec::new()).push(node1);
+            edges.entry(node1).or_insert(FxHashSet::default()).insert(node2);
+            edges.entry(node2).or_insert(FxHashSet::default()).insert(node1);
         }
         Self { nodes, edges }
     }
@@ -120,10 +129,9 @@ fn parse(input: &str) -> Network {
 #[aoc(day23, part1)]
 pub fn part1(input: &str) -> i64 {
     let network = parse(input);
-    // println!("edges: {:?}", network.edges);
+
     let sets = network.groups_3();
     let t_count = sets.iter().filter(|set| set.iter().any(|s| s.0[0] == 't')).count();
-    // println!("groups: {:?}", sets);
 
     t_count as i64
 }
@@ -135,7 +143,6 @@ pub fn part2(input: &str) -> String {
     let largest_set = best_sets.iter().max_by(|a, b| a.len().cmp(&b.len())).unwrap();
     let mut largest = largest_set.iter().collect_vec();
     largest.sort();
-    println!("best: {:?}", largest);
     largest.iter().join(",")
 }
 
